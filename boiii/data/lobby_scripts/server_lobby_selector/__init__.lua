@@ -65,15 +65,15 @@ Lobby.Process.CreateDedicatedModsLobby = function(controller, toTarget)
         -- Issue #410: an empty or malformed rotation used to reach launchgame with
         -- no map set, which leaves the server in a dead lobby. Say what is wrong
         -- and stay where a map can still be set.
-        Engine.Exec(0, "echo ^1[ Lobby ]^7 sv_skip_lobby is 1 but sv_maprotation does not name a gametype and a map; set it as \"gametype <mode> map <map>\" in the server config, then change the map again.")
+        Engine.Exec(
+          0,
+          'echo ^1[ Lobby ]^7 sv_skip_lobby is 1 but sv_maprotation does not name a gametype and a map; set it as "gametype <mode> map <map>" in the server config, then change the map again.'
+        )
       else
         Engine.Exec(0, "lobby_setgametype " .. map_rotation_tokens[2])
         Engine.Exec(0, "lobby_setmap " .. map_rotation_tokens[4])
         local mode = map_rotation_tokens[2]
-        if
-          Engine.DvarBool(nil, "sv_autoGametypeSettings")
-          and mode:match("^[a-zA-Z0-9_]+$")
-        then
+        if Engine.DvarBool(nil, "sv_autoGametypeSettings") and mode:match("^[a-zA-Z0-9_]+$") then
           Engine.Exec(0, "exec gamedata/gamesettings/mp/gamesettings_" .. mode .. ".cfg")
         end
         Engine.Exec(0, "launchgame")
