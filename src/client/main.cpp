@@ -202,13 +202,15 @@ void ensure_compatible_client_binary(
   case client_binary_state::supported:
     break;
   case client_binary_state::unreadable:
-    throw std::runtime_error(
-        "BlackOps3.exe could not be read. Check that the game folder is complete, "
-        "then verify the game files in Steam.");
+    throw std::runtime_error("BlackOps3.exe could not be read. Check that the "
+                             "game folder is complete, "
+                             "then verify the game files in Steam.");
   case client_binary_state::incompatible:
     throw std::runtime_error(
-        "This BlackOps3.exe is not the game build CodHQ BOIII supports. CodHQ BOIII "
-        "never replaces your game executable: in Steam, right-click Black Ops III, "
+        "This BlackOps3.exe is not the game build CodHQ BOIII supports. CodHQ "
+        "BOIII "
+        "never replaces your game executable: in Steam, right-click Black Ops "
+        "III, "
         "open Properties > Installed Files and choose Verify integrity of game "
         "files, then start again.");
   }
