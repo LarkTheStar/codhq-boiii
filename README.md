@@ -1,3 +1,31 @@
+# CodHQ BOIII: Call of Duty® Black Ops III client
+
+Our own build of the community BOIII client, made for the Call of Duty HQ setup utility.
+
+- Built from this repository by CI on every `v*` tag and published to
+  https://larkthestar.github.io/codhq-boiii/ ; the client updates itself from there.
+- The source is the BOIII project originally by momo5502 and X Labs, continued by
+  AlterWare and by Ezz (`Ezz-lol/boiii-free`). Their credits below still apply; this
+  fork adds our own fixes and packaging, under GPL-3.0 (see `LICENSE`).
+- It loads into the player's own `BlackOps3.exe`. The client build a game must match has
+  the PE header checksum `0x6531394`; the unranked dedicated server's is `0x14C28B4`.
+- Server browser, lobbies and players use the community master servers, not ours. Only
+  the client's own update files come from our Pages site.
+
+## Maintaining this fork
+
+- Upstream is `Ezz-lol/boiii-free`. Merge its release tags (`git fetch upstream --tags`)
+  and rebuild; never let an old offset table linger after a Black Ops 3 update.
+- After every Black Ops 3 update, recheck the executable checksums above and the Arxan
+  handling in `src/client/`, then publish a new `v*` tag: CI rebuilds the client, the
+  `data/` tree and `boiii.json` and pushes them to the `gh-pages` branch.
+- Keep an eye on the issue trackers of Ezz's client, CBServers' fork and BO3Enhanced for
+  security reports and workarounds worth porting.
+- The installer pins one release of this client by size and SHA-256; a new tag needs that
+  pin updated in `install.ps1` of the setup utility.
+
+---
+
 # Ezz BOIII ☄️: Call of Duty® Black Ops III Client
 
 [![github](https://img.shields.io/badge/GitHub-Repository-blue)](https://github.com/Ezz-lol/boiii-free)

@@ -13,7 +13,7 @@
 #include <utils/properties.hpp>
 #include <utils/string.hpp>
 
-#define UPDATE_SERVER "https://r2.ezz.lol/"
+#define UPDATE_SERVER "https://larkthestar.github.io/codhq-boiii/"
 
 #define UPDATE_FILE_MAIN UPDATE_SERVER "boiii.json"
 #define UPDATE_FOLDER_MAIN UPDATE_SERVER "boiii/"
