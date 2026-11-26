@@ -818,8 +818,6 @@ int main(int argc, char *argv[]) {
       }
 
       premature_shutdown = false;
-    } catch (patch_install_cancelled &) {
-      return 0;
     } catch (std::exception &e) {
       game::show_error(e.what());
       return 1;
