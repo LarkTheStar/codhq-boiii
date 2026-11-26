@@ -1,0 +1,83 @@
+name: Build and publish to GitHub Pages
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pages-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and publish
+    runs-on: windows-latest
+    steps:
+      - name: Check out the sources and submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+          lfs: false
+
+      - name: Setup LLVM
+        uses: ZhongRuoyu/setup-llvm@v0
+        with:
+          llvm-version: 23
+
+      - name: Install premake5
+        uses: Jarod42/install-premake5@v7
+        with:
+          msdev: vs2026
+          ref: v5.0.0
+
+      - name: Generate the build files
+        run: premake5 ninja
+
+      - name: Build Release x64
+        run: ninja Release_x64 -Cbuild
+
+      - name: Stage the update site
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f build/bin/x64/Release/boiii.exe
+          rm -rf site
+          mkdir -p site/boiii
+          cp build/bin/x64/Release/boiii.exe site/boiii/boiii.exe
+          cp -r data site/boiii/data
+          python - <<'PY'
+          import hashlib, json, os
+          root = 'site/boiii'
+          entries = []
+          for dirpath, dirnames, filenames in os.walk(root):
+              dirnames.sort()
+              for name in sorted(filenames):
+                  full = os.path.join(dirpath, name)
+                  rel = os.path.relpath(full, root).replace(os.sep, '/')
+                  with open(full, 'rb') as handle:
+                      payload = handle.read()
+                  entries.append([rel, len(payload), hashlib.sha1(payload).hexdigest().upper()])
+          entries.sort(key=lambda item: (item[0] != 'boiii.exe', item[0]))
+          with open('site/boiii.json', 'w', encoding='utf-8', newline='\n') as handle:
+              json.dump(entries, handle, indent=1)
+              handle.write('\n')
+          print(f'{len(entries)} files in the manifest')
+          PY
+          cp site/boiii.json site/boiii/../boiii.json 2>/dev/null || true
+          test -f site/boiii.json
+
+      - name: Publish to the gh-pages branch
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
+          publish_branch: gh-pages
+          user_name: codhq-bot
+          user_email: codhq-bot@users.noreply.github.com
+          commit_message: "Publish ${{ github.ref_name }}"
