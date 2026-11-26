@@ -987,6 +987,14 @@ bool is_hidden_developer_message(const std::string_view message) {
          game::get_dvar_int("developer").value_or(0) < 1;
 }
 
+// Issue #339: a warning printed on every frame or every tick made the console
+// unreadable and grew its buffer without bound. Keep only the last line and a
+// counter, so memory stays flat, and stop printing an identical repetition
+// after a handful of copies.
+constexpr uint64_t MAX_REPEATED_LINES = 5;
+std::mutex repeat_mutex;
+std::string last_queued_message;
+uint64_t repeated_message_count = 0;
 void queue_message(const char *message) {
   if (!message || !message[0] || is_hidden_developer_message(message)) {
     return;
@@ -1002,8 +1010,31 @@ void queue_message(const char *message) {
         });
   }
 
+  std::string repeat_summary;
+  {
+    std::scoped_lock lock(repeat_mutex);
+    if (last_queued_message == message) {
+      ++repeated_message_count;
+      if (repeated_message_count > MAX_REPEATED_LINES) {
+        return;
+      }
+    } else {
+      if (repeated_message_count > MAX_REPEATED_LINES) {
+        repeat_summary = std::format(
+            "^3[ console ]^7 The line above repeated {} more times; further "
+            "copies are hidden until another line is printed.\n",
+            repeated_message_count - MAX_REPEATED_LINES);
+      }
+      last_queued_message = message;
+      repeated_message_count = 0;
+    }
+  }
+
   {
     std::scoped_lock lock(pending_output_mutex);
+    if (!repeat_summary.empty()) {
+      pending_output.append(repeat_summary);
+    }
     pending_output.append(message);
   }
   pending_output_cv.notify_one();
