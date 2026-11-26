@@ -911,6 +911,30 @@ hksInt32 hks_load_stub(lua_State *state, HksCompilerSettings *compiler_options,
                   debug_reader_data, chunk_name);
 }
 
+// Issue #392: when a mod ships a UI script with the same name as one the client
+// provides, the client's copy is the one that runs. Say which mod and which
+// file that is instead of letting the mod silently do nothing.
+std::mutex script_conflict_mutex;
+std::unordered_set<std::string> warned_script_conflicts;
+
+void warn_about_mod_script_conflict(const std::string &name,
+                                    const std::string &ours) {
+  const std::string_view mod = game::ugc::active_mod->publisherId;
+  if (mod.empty()) {
+    return;
+  }
+  {
+    std::scoped_lock lock(script_conflict_mutex);
+    if (!warned_script_conflicts.insert(name).second) {
+      return;
+    }
+  }
+  const std::string_view title = game::ugc::active_mod->title;
+  printf("^3[ Mods ]^7 %s (%s) ships %s, but CodHQ BOIII loads its own %s "
+         "instead, so that mod's changes to this file do not apply.\n",
+         title.empty() ? "This mod" : std::string(title).c_str(),
+         std::string(mod).c_str(), name.c_str(), ours.c_str());
+}
 xasset::XAssetHeader lua_cod_getrawfile_stub(char *filename) {
   if (!is_loaded_script(globals.in_require_script) &&
       !is_local_script(filename)) {
@@ -933,6 +957,9 @@ xasset::XAssetHeader lua_cod_getrawfile_stub(char *filename) {
     } else if (!name_.ends_with(".lua") &&
                globals.local_scripts.contains(name_ + ".lua")) {
       target_script = globals.local_scripts[name_ + ".lua"];
+    }
+    if (!target_script.empty()) {
+      warn_about_mod_script_conflict(name_, target_script);
     }
   }
 
