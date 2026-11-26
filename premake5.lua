@@ -679,7 +679,12 @@ filter({})
 filter({ "configurations:Release", "toolset:not msc*" })
 
 buildoptions(mergeArrays(archFlags, optimizationFlags, toolsetConfigurationFlags))
-linkoptions(mergeArrays(archFlags, toolsetConfigurationFlags, optimizationFlags, clangLinkerOptimizationFlags))
+-- /Brepro makes the PE header timestamp a hash of the output instead of the link
+-- time, so rebuilding the same sources with the same toolchain gives the same
+-- bytes. The installer pins one published build, and a CI re-run has to produce
+-- that same build rather than a new hash.
+linkoptions(mergeArrays(archFlags, toolsetConfigurationFlags, optimizationFlags,
+  clangLinkerOptimizationFlags, { "-Wl,/Brepro" }))
 filter({})
 
 filter("configurations:Debug")
