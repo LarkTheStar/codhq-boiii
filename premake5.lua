@@ -683,8 +683,9 @@ buildoptions(mergeArrays(archFlags, optimizationFlags, toolsetConfigurationFlags
 -- time, so rebuilding the same sources with the same toolchain gives the same
 -- bytes. The installer pins one published build, and a CI re-run has to produce
 -- that same build rather than a new hash.
-linkoptions(mergeArrays(archFlags, toolsetConfigurationFlags, optimizationFlags,
-  clangLinkerOptimizationFlags, { "-Wl,/Brepro" }))
+linkoptions(
+  mergeArrays(archFlags, toolsetConfigurationFlags, optimizationFlags, clangLinkerOptimizationFlags, { "-Wl,/Brepro" })
+)
 filter({})
 
 filter("configurations:Debug")
