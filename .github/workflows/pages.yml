@@ -76,6 +76,43 @@ jobs:
         shell: pwsh
         run: Compress-Archive -Path site/boiii/boiii.exe, site/boiii/data -DestinationPath site/codhq-boiii.zip -CompressionLevel Optimal
 
+      - name: Write the site landing page
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > site/index.html <<'HTML'
+          <!doctype html>
+          <html lang="en">
+          <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>CodHQ BOIII</title>
+          <style>
+          body { font-family: system-ui, sans-serif; max-width: 46rem; margin: 3rem auto; padding: 0 1rem; line-height: 1.6; color: #1b1b1b; }
+          code { background: #f0f0f0; padding: 0.1rem 0.3rem; border-radius: 3px; }
+          </style>
+          </head>
+          <body>
+          <h1>CodHQ BOIII</h1>
+          <p>This is the update site for the CodHQ BOIII client. It is not a web page you
+          play on: the client reads the files below.</p>
+          <h2>Download</h2>
+          <ul>
+          <li><a href="codhq-boiii.zip">codhq-boiii.zip</a>: the client executable and its whole data tree.</li>
+          <li><a href="boiii.json">boiii.json</a>: the published file list with size and SHA-1 of every entry.</li>
+          <li><a href="boiii/boiii.exe">boiii/boiii.exe</a>: the client executable on its own.</li>
+          </ul>
+          <h2>Installing</h2>
+          <p>Install it from the CodHQ setup utility, which pins this release by the
+          SHA-256 of <code>codhq-boiii.zip</code> and checks every file against
+          <code>boiii.json</code> before and after writing. An installed client updates
+          itself from this site when it starts.</p>
+          <p>Source: <a href="https://github.com/LarkTheStar/codhq-boiii">LarkTheStar/codhq-boiii</a>.</p>
+          </body>
+          </html>
+          HTML
+          test -f site/index.html
+
       - name: Publish to the gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
