@@ -13,6 +13,8 @@
 
 #include <utils/hook.hpp>
 
+#include <sstream>
+
 namespace dedicated {
 game::EngineDependentDvar sv_lan_only;
 
@@ -32,6 +34,52 @@ void send_heartbeat() {
 
 namespace command {
 namespace {
+// Upstream PR #415: a dedicated MP server that rotates to a map with an
+// explicit gametype used to keep the previous gametype's rules. Load that
+// gametype's settings before the rotation consumes the entry.
+// sv_autoGametypeSettings=0 lets servers that apply their own rules (a mapvote,
+// an exec) keep doing that.
+game::EngineDependentDvar sv_auto_gametype_settings;
+utils::hook::detour map_rotate_hook;
+
+std::string next_rotation_gametype(std::string_view rotation) {
+  std::istringstream tokens{std::string(rotation)};
+  std::string mode;
+  std::string key;
+  std::string value;
+  while (tokens >> key >> value) {
+    if (key == "map") {
+      return mode;
+    }
+    if (key != "gametype" ||
+        value.find_first_not_of("abcdefghijklmnopqrstuvwxyz"
+                                "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_") !=
+            std::string::npos) {
+      return {};
+    }
+    mode = value;
+  }
+  return {};
+}
+
+void map_rotate_stub() {
+  if (sv_auto_gametype_settings.get_bool() &&
+      game::com::Com_SessionMode_IsMode(game::eModes::MULTIPLAYER)) {
+    auto rotation = game::maprotationcurrent().value_or("");
+    if (rotation.find_first_not_of(" \t\r\n") == std::string_view::npos) {
+      rotation = game::maprotation().value_or("");
+    }
+    const auto mode = next_rotation_gametype(rotation);
+    if (!mode.empty()) {
+      const auto cmd = std::format(
+          "exec gamedata/gamesettings/mp/gamesettings_{}.cfg", mode);
+      game::cmd::Cmd_ExecuteSingleCommand(0, game::CONTROLLER_INDEX_FIRST,
+                                          cmd.c_str(), false);
+    }
+  }
+  map_rotate_hook.invoke<void>();
+}
+
 constexpr const char *compatibility_commands[] = {
     "ffotdversion",     "bbdisable", "bbenable",
     "bitfieldBBPrints", "bbstart",   "setliveevent"};
@@ -81,6 +129,10 @@ struct component final : server_component {
     // Hook GScr_ExitLevel
     utils::hook::jump(0x1402D1AA0_g, trigger_map_rotation);
 
+    sv_auto_gametype_settings = game::register_dvar_bool(
+        "sv_autoGametypeSettings", true, game::dvarFlags_e::NONE,
+        "Load the MP gametype config for each gametype entry in map rotation");
+    map_rotate_hook.create(game::sv::SV_MapRotate_f.get(), map_rotate_stub);
     sv_lan_only = game::register_dvar_bool(
         "sv_lanOnly", false, game::dvarFlags_e::NONE, "Don't send heartbeats");
   }

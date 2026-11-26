@@ -69,7 +69,13 @@ Lobby.Process.CreateDedicatedModsLobby = function(controller, toTarget)
       else
         Engine.Exec(0, "lobby_setgametype " .. map_rotation_tokens[2])
         Engine.Exec(0, "lobby_setmap " .. map_rotation_tokens[4])
-
+        local mode = map_rotation_tokens[2]
+        if
+          Engine.DvarBool(nil, "sv_autoGametypeSettings")
+          and mode:match("^[a-zA-Z0-9_]+$")
+        then
+          Engine.Exec(0, "exec gamedata/gamesettings/mp/gamesettings_" .. mode .. ".cfg")
+        end
         Engine.Exec(0, "launchgame")
       end
     end
