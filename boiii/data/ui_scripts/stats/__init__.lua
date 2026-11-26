@@ -1,0 +1,424 @@
+if Engine.GetCurrentMap() ~= "core_frontend" then
+  return
+end
+
+local function refreshCurrencyModels(controller)
+  local controllerModel = Engine.GetModelForController(controller)
+  local currencyModel = Engine.CreateModel(controllerModel, "CryptoKeyProgress")
+  Engine.SetModelValue(Engine.CreateModel(currencyModel, "codPoints"), Engine.GetCoDPoints(controller))
+  local tokenModel = Engine.CreateModel(controllerModel, "MegaChewTokens")
+  Engine.SetModelValue(Engine.CreateModel(tokenModel, "remainingTokens"), Engine.GetZMVials(controller))
+  if DataSources.GobbleGumDistills then
+    DataSources.GobbleGumDistills.getModel(controller)
+  end
+end
+
+local easterEggStats = {
+  "DARKOPS_ZOD_EE",
+  "DARKOPS_ZOD_SUPER_EE",
+  "DARKOPS_FACTORY_EE",
+  "DARKOPS_FACTORY_SUPER_EE",
+  "DARKOPS_CASTLE_EE",
+  "DARKOPS_CASTLE_SUPER_EE",
+  "DARKOPS_ISLAND_EE",
+  "DARKOPS_ISLAND_SUPER_EE",
+  "DARKOPS_STALINGRAD_EE",
+  "DARKOPS_STALINGRAD_SUPER_EE",
+  "DARKOPS_GENESIS_EE",
+  "DARKOPS_GENESIS_SUPER_EE",
+}
+
+local modeRanks = {
+  [Enum.eModes.MODE_MULTIPLAYER] = {
+    levels = { 1, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55 },
+    masterLevels = { 56, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 },
+    paragonOffset = 55,
+    maxXpBonus = 55600,
+    rankTableSkip = 3,
+    rankTable = "gamedata/tables/mp/mp_ranktable.csv",
+    paragonTable = "gamedata/tables/mp/mp_paragonranktable.csv",
+  },
+  [Enum.eModes.MODE_ZOMBIES] = {
+    levels = { 1, 5, 10, 15, 20, 25, 30, 35 },
+    masterLevels = { 36, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 },
+    paragonOffset = 35,
+    maxXpBonus = 54244,
+    rankTableSkip = 2,
+    rankTable = "gamedata/tables/zm/zm_ranktable.csv",
+    paragonTable = "gamedata/tables/zm/zm_paragonranktable.csv",
+  },
+  [Enum.eModes.MODE_CAMPAIGN] = {
+    levels = { 1, 5, 10, 15, 20 },
+    masterLevels = { 21, 50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 },
+    paragonOffset = 20,
+    maxXpBonus = 0,
+    rankTableSkip = 2,
+    rankTable = "gamedata/tables/cp/cp_ranktable.csv",
+    paragonTable = "gamedata/tables/cp/cp_paragonranktable.csv",
+  },
+}
+
+local function toggleSetting(controller, name, description, id, dvar, enabledByDefault, action)
+  return CoD.OptionsUtility.CreateDvarSettings(controller, name, description, id, dvar, {
+    { option = "MENU_DISABLED", value = 0, default = not enabledByDefault },
+    { option = "MENU_ENABLED", value = 1, default = enabledByDefault },
+  }, nil, action)
+end
+
+local function allEasterEggsCompleted(controller)
+  local stats = Engine.GetPlayerStats(controller, CoD.STATS_LOCATION_NORMAL, Enum.eModes.MODE_ZOMBIES)
+  if not stats or not stats.PlayerStatsList then
+    return false
+  end
+  for _, name in ipairs(easterEggStats) do
+    local stat = stats.PlayerStatsList[name]
+    if not stat or not stat.StatValue or stat.StatValue:get() ~= 1 then
+      return false
+    end
+  end
+  return true
+end
+
+local function createSettingsDatasource(controller, datasourceName, optionList, currentValue, loopEdges, action)
+  if currentValue == nil then
+    currentValue = 0
+  end
+  DataSources[datasourceName] = DataSourceHelpers.ListSetup(datasourceName, function(ctrl)
+    local listItems = {}
+    for index, optionDef in ipairs(optionList) do
+      table.insert(listItems, {
+        models = {
+          text = optionList[index].name,
+        },
+        properties = {
+          title = optionList[index].title,
+          desc = optionList[index].desc,
+          image = optionList[index].image,
+          value = optionList[index].value,
+          default = optionList[index].default,
+          action = action,
+          selectIndex = optionList[index].value == currentValue,
+          loopEdges = loopEdges,
+          showChangeIndicator = function(props, model, element)
+            return props.default ~= true
+          end,
+        },
+      })
+    end
+    if #listItems > 0 then
+      listItems[1].properties.first = true
+      listItems[#listItems].properties.last = true
+    end
+    return listItems
+  end, nil, nil, nil)
+  return datasourceName
+end
+
+DataSources.MPStatsSettings = DataSourceHelpers.ListSetup("MPStatsSettings", function(controller)
+  local optionsTable = {}
+
+  Engine.SetDvar("all_ee_completed", allEasterEggsCompleted(controller) and 1 or 0)
+
+  local updateDvar = function(element, itemModel, controllerIndex, dvarName, param)
+    local oldValue = Engine.DvarInt(nil, dvarName)
+    local newValue = itemModel.value
+    UpdateInfoModels(itemModel)
+    if oldValue == newValue then
+      return
+    end
+    Engine.SetDvar(dvarName, itemModel.value)
+    if dvarName == "cg_unlockall_loot" or dvarName == "cg_unlockall_blackjack" then
+      local blackjack = Dvar.cg_unlockall_loot:get() == true or Dvar.cg_unlockall_blackjack:get() == true
+      Engine.SetDvar("ui_enableAllHeroes", blackjack and 1 or 0)
+    end
+    if dvarName == "all_ee_completed" then
+      for _, stat in ipairs(easterEggStats) do
+        Engine.ExecNow(controllerIndex, "statsetbyname " .. stat .. " " .. itemModel.value)
+      end
+      game.savestats(controllerIndex, Enum.eModes.MODE_ZOMBIES)
+    end
+  end
+
+  local mode = Engine.CurrentSessionMode()
+  local isMP = mode == Enum.eModes.MODE_MULTIPLAYER
+  local isZM = mode == Enum.eModes.MODE_ZOMBIES
+  local function addToggle(name, description, id, dvar, enabledByDefault, action)
+    table.insert(
+      optionsTable,
+      toggleSetting(controller, name, description, id, dvar, enabledByDefault, action or updateDvar)
+    )
+  end
+
+  local function addCurrencyToggle(name, description, currency)
+    local options = {}
+    for value, text in ipairs({ "MENU_DISABLED", "MENU_ENABLED" }) do
+      table.insert(options, { name = Engine.Localize(text), value = value - 1, title = name, desc = description })
+    end
+    local maxed = game.iscurrencymaxed(controller, currency) and 1 or 0
+    options[maxed + 1].default = true
+    table.insert(optionsTable, {
+      models = {
+        name = name,
+        desc = description,
+        optionsDatasource = createSettingsDatasource(
+          controller,
+          "MPStatsSettings_max_currency_" .. currency,
+          options,
+          maxed,
+          false,
+          function(element, itemModel, controllerIndex)
+            UpdateInfoModels(itemModel)
+            local enable = itemModel.value == 1
+            if enable == game.iscurrencymaxed(controllerIndex, currency) then
+              return
+            end
+            if game.setcurrencymaxed(controllerIndex, currency, enable) then
+              refreshCurrencyModels(controllerIndex)
+              CoD.OverlayUtility.ShowToast(
+                "BlackMarketEquipped",
+                name .. (enable and " maxed." or " cleared."),
+                nil,
+                "uie_t7_icon_codpoints"
+              )
+            else
+              LuaUtils.UI_ShowErrorMessageDialog(
+                controllerIndex,
+                "Could not update " .. name .. ". Try again from the menu."
+              )
+            end
+          end
+        ),
+      },
+      properties = {
+        revert = function(element) end,
+      },
+    })
+  end
+
+  addToggle("Unlock All Loot", "Unlocks all Black Market loot.", "MPStatsSettings_unlock_loot", "cg_unlockall_loot")
+  if isZM and type(game.resetgobblegums) == "function" and type(game.setcurrencymaxed) == "function" then
+    addToggle(
+      "Unlimited GobbleGums",
+      "Uses unlimited GobbleGums without replacing your earned inventory.",
+      "MPStatsSettings_unlimited_gobblegums",
+      "cg_unlockall_gobblegums"
+    )
+    addCurrencyToggle(
+      "Max COD Points",
+      "Sets COD Points to maximum or zero.",
+      Enum.InventoryCurrency.INVENTORY_CURRENCY_COD_POINTS
+    )
+    addCurrencyToggle(
+      "Max Zombies Currencies",
+      "Sets Liquid Divinium and Cookbook Distills to maximum or zero.",
+      Enum.InventoryCurrency.INVENTORY_CURRENCY_ZM_VIALS
+    )
+  end
+  if isMP then
+    if type(game.setcurrencymaxed) == "function" then
+      addCurrencyToggle(
+        "Max COD Points",
+        "Sets COD Points to maximum or zero.",
+        Enum.InventoryCurrency.INVENTORY_CURRENCY_COD_POINTS
+      )
+      addToggle(
+        "Black Market Duplicates",
+        "Supply drops can give items you already own. Burn them for Cryptokeys in the Black Market's Duplicates tab.",
+        "MPStatsSettings_loot_duplicates",
+        "cg_loot_duplicates",
+        true
+      )
+      addCurrencyToggle(
+        "Max Cryptokeys",
+        "Sets Cryptokeys to maximum or zero.",
+        Enum.InventoryCurrency.INVENTORY_CURRENCY_MP_CRYPTO_KEYS
+      )
+    end
+    addToggle(
+      "Unlock All Purchases",
+      "All items that need to be purchased with unlock tokens are unlocked.",
+      "MPStatsSettings_purchase_all",
+      "cg_unlockall_purchases"
+    )
+    addToggle(
+      "Unlock All Class Slots",
+      "Unlocks all create-a-class slots and sets.",
+      "MPStatsSettings_unlockall_cac_slots",
+      "cg_unlockall_cac_slots"
+    )
+  end
+  addToggle(
+    "Unlock All Attachments",
+    "All attachments on weapons are unlocked.",
+    "MPStatsSettings_unlockall_attachments",
+    "cg_unlockall_attachments"
+  )
+  addToggle(
+    "Unlock all Camos and Reticles",
+    "All camos and reticles on weapons are unlocked.",
+    "MPStatsSettings_unlockall_camos_and_reticles",
+    "cg_unlockall_camos_and_reticles"
+  )
+  addToggle(
+    "Unlock all Calling Cards",
+    "All calling cards are unlocked.",
+    "MPStatsSettings_unlockall_calling_cards",
+    "cg_unlockall_calling_cards"
+  )
+  if isMP then
+    addToggle(
+      "Unlock all Specialists Outfits",
+      "All specialists outfits are unlocked.",
+      "MPStatsSettings_unlockall_specialists_outfits",
+      "cg_unlockall_specialists_outfits"
+    )
+    addToggle(
+      "Unlock Blackjack",
+      "Blackjack can be used without a Mercenary Contract.",
+      "MPStatsSettings_unlock_blackjack",
+      "cg_unlockall_blackjack"
+    )
+  end
+  if isZM then
+    addToggle(
+      "Unlock Easter Eggs",
+      "Complete all Easter Egg Achievements.",
+      "MPStatsSettings_complete_ee",
+      "all_ee_completed"
+    )
+  end
+
+  local ranks = modeRanks[mode]
+  local rankObjs = {}
+  local currentPrestige = CoD.PrestigeUtility.GetCurrentPLevel(controller, mode)
+  local currentRank = CoD.BlackMarketUtility.GetCurrentRank(controller) + 1
+
+  local isMasterPrestige = currentPrestige == 11
+  if ranks and isMasterPrestige then
+    local stats = Engine.GetPlayerStats(controller, CoD.STATS_LOCATION_NORMAL, mode)
+    if stats and stats.PlayerStatsList and stats.PlayerStatsList.PARAGON_RANK then
+      currentRank = stats.PlayerStatsList.PARAGON_RANK.StatValue:get() + ranks.paragonOffset + 1
+    end
+  end
+
+  local rankLevels = ranks and (isMasterPrestige and ranks.masterLevels or ranks.levels) or {}
+
+  if #rankLevels > 0 then
+    local maxlevel = math.max(table.unpack(rankLevels))
+    local minlevel = math.min(table.unpack(rankLevels))
+
+    for index, value in ipairs(rankLevels) do
+      table.insert(rankObjs, {
+        name = value <= minlevel and "Min" or value >= maxlevel and "Max" or value,
+        value = value - 1,
+        default = value == currentRank,
+        title = "Rank Level",
+        desc = value ~= currentRank and "" or "Current Rank",
+      })
+    end
+
+    if currentRank ~= minlevel and currentRank < maxlevel then
+      table.insert(rankObjs, {
+        name = "Current: "
+          .. tostring(currentRank <= minlevel and "Min" or currentRank >= maxlevel and "Max" or currentRank),
+        value = currentRank - 1,
+        default = true,
+        title = "Rank Level",
+        desc = "Do not adjust rank",
+      })
+    end
+  end
+
+  local prestigeTable = {}
+  for i = 0, 11 do
+    table.insert(prestigeTable, {
+      name = i == 0 and "None" or i == 11 and "Master" or i,
+      value = i,
+      default = i == currentPrestige,
+      title = "Prestige",
+      desc = "",
+    })
+  end
+
+  if #rankLevels > 0 then
+    table.insert(optionsTable, {
+      models = {
+        name = "Prestige",
+        desc = "",
+        image = nil,
+        optionsDatasource = createSettingsDatasource(
+          controller,
+          "MPStatsSettings_rank_prestige",
+          prestigeTable,
+          CoD.PrestigeUtility.GetCurrentPLevel(controller, mode),
+          false,
+          function(element, itemModel, controllerIndex, dvarName, param)
+            UpdateInfoModels(itemModel)
+            local newPrestige = itemModel.value
+            if newPrestige == 11 then
+              Engine.ExecNow(controllerIndex, "PrestigeStatsMaster " .. tostring(mode))
+            end
+            Engine.ExecNow(controllerIndex, "statsetbyname plevel " .. newPrestige)
+            Engine.ExecNow(controllerIndex, "statsetbyname hasprestiged " .. (newPrestige > 0 and 1 or 0))
+            game.savestats(controllerIndex, mode)
+          end
+        ),
+      },
+      properties = {
+        revert = function(element) end,
+      },
+    })
+
+    table.insert(optionsTable, {
+      models = {
+        name = "Rank Level",
+        desc = "",
+        image = nil,
+        optionsDatasource = createSettingsDatasource(
+          controller,
+          "MPStatsSettings_rank_level",
+          rankObjs,
+          currentRank - 1,
+          false,
+          function(element, itemModel, controllerIndex, dvarName, param)
+            UpdateInfoModels(itemModel)
+            local rank = itemModel.value + 1
+            if rank == currentRank then
+              return
+            end
+            local function maxXpForRow(rankTable, row)
+              local maxXp = tonumber(Engine.TableLookupGetColumnValueForRow(rankTable, row, 7)) or 0
+              if rank == maxlevel then
+                maxXp = maxXp + ranks.maxXpBonus
+              end
+              return maxXp
+            end
+            if not isMasterPrestige then
+              local maxXp = maxXpForRow(ranks.rankTable, rank - 2 + ranks.rankTableSkip)
+              Engine.ExecNow(controllerIndex, "statsetbyname rank " .. rank - 1)
+              Engine.ExecNow(controllerIndex, "statsetbyname rankxp " .. maxXp)
+              Engine.ExecNow(controllerIndex, "statsetbyname paragon_rankxp 0")
+            else
+              local paragonRank = rank - ranks.paragonOffset
+              local maxXp = maxXpForRow(ranks.paragonTable, paragonRank)
+              Engine.ExecNow(controllerIndex, "statsetbyname paragon_rank " .. paragonRank - 1)
+              Engine.ExecNow(controllerIndex, "statsetbyname paragon_rankxp " .. maxXp)
+            end
+            game.savestats(controllerIndex, mode)
+
+            currentRank = rank
+          end
+        ),
+      },
+      properties = {
+        revert = function(element) end,
+      },
+    })
+  end -- #rankLevels > 0
+
+  return optionsTable
+end)
+
+if Dvar.cg_unlockall_loot:get() == true or Dvar.cg_unlockall_blackjack:get() == true then
+  Engine.SetDvar("ui_enableAllHeroes", 1)
+end

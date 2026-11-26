@@ -1,0 +1,211 @@
+local function isLocalGameHost()
+  if game and game.ishost then
+    return game.ishost()
+  end
+
+  local connectedToDedicated = false
+  pcall(function()
+    connectedToDedicated = Dvar.cl_connected_to_dedi and Dvar.cl_connected_to_dedi:get()
+  end)
+
+  return Engine.IsLobbyHost(Enum.LobbyType.LOBBY_TYPE_GAME) and not connectedToDedicated
+end
+
+local function friendsPartyLabel()
+  if Engine.DvarBool(nil, "friends_open") then
+    return "^2PARTY IS OPEN"
+  end
+  return "^1PARTY IS CLOSED"
+end
+
+local function openPopup(name)
+  return function(self, element, controller)
+    OpenPopup(self, name, controller)
+  end
+end
+
+local function addHostOptions(options)
+  table.insert(options, {
+    models = {
+      displayText = friendsPartyLabel(),
+      action = function(self, element, controller)
+        Engine.ExecNow(controller, "friends_open")
+        Engine.SetModelValue(Engine.GetModel(element:getModel(), "displayText"), friendsPartyLabel())
+      end,
+    },
+  })
+  table.insert(options, { models = { displayText = "^3CHANGE MAP", action = openPopup("BoiiiChangeMapMenu") } })
+  table.insert(options, { models = { displayText = "^3KICK PLAYERS", action = openPopup("BoiiiKickPlayersMenu") } })
+  table.insert(options, { models = { displayText = "^3RESTART", action = RestartGame } })
+  if LUI.createMenu.BoiiiGameTweaksMenu then
+    table.insert(options, { models = { displayText = "^3GAME TWEAKS", action = openPopup("BoiiiGameTweaksMenu") } })
+  end
+end
+
+local customStartMenuGameOptions = ListHelper_SetupDataSource("StartMenuGameOptions", function(controller)
+  local options = {}
+  local currentMode = Engine.CurrentSessionMode()
+  local isMP = currentMode == Enum.eModes.MODE_MULTIPLAYER
+  local isZM = currentMode == Enum.eModes.MODE_ZOMBIES
+  local isCP = currentMode == Enum.eModes.MODE_CAMPAIGN
+  local endGameOption = nil
+  local isLocalHost = isLocalGameHost()
+  if Engine.IsDemoPlaying() then
+    if not IsDemoRestrictedBasicMode() then
+      table.insert(options, {
+        models = {
+          displayText = Engine.ToUpper(Engine.Localize("MENU_UPLOAD_CLIP", Engine.GetDemoSegmentCount())),
+          action = StartMenuUploadClip,
+          disabledFunction = IsUploadClipButtonDisabled,
+        },
+        properties = { hideHelpItemLabel = true },
+      })
+    end
+    if Engine.IsDemoHighlightReelMode() then
+      table.insert(options, {
+        models = {
+          displayText = Engine.ToUpper(Engine.Localize("MENU_DEMO_CUSTOMIZE_HIGHLIGHT_REEL")),
+          action = StartMenuOpenCustomizeHighlightReel,
+          disabledFunction = IsCustomizeHighlightReelButtonDisabled,
+        },
+      })
+    end
+    table.insert(options, {
+      models = {
+        displayText = Engine.ToUpper(Engine.ToUpper(Engine.Localize("MENU_JUMP_TO_START"))),
+        action = StartMenuJumpToStart,
+        disabledFunction = IsJumpToStartButtonDisabled,
+      },
+      properties = { hideHelpItemLabel = true },
+    })
+    local endDemoButtonText = nil
+    if Engine.IsDemoClipPlaying() then
+      endDemoButtonText = Engine.ToUpper(Engine.Localize("MENU_END_CLIP"))
+    else
+      endDemoButtonText = Engine.ToUpper(Engine.Localize("MENU_END_FILM"))
+    end
+    table.insert(options, { models = { displayText = Engine.ToUpper(endDemoButtonText), action = StartMenuEndDemo } })
+  elseif isCP then
+    table.insert(options, { models = { displayText = "MENU_RESUMEGAME_CAPS", action = StartMenuGoBack_ListElement } })
+    local inTrainingSim = CoD.SafeGetModelValue(Engine.GetModelForController(controller), "safehouse.inTrainingSim")
+    if not inTrainingSim then
+      inTrainingSim = 0
+    end
+    if Engine.IsLobbyHost(Enum.LobbyType.LOBBY_TYPE_GAME) then
+      if not CoD.isSafehouse and controller == Engine.GetPrimaryController() then
+        table.insert(options, { models = { displayText = "MENU_RESTART_MISSION_CAPS", action = RestartMission } })
+        if LUI.DEV ~= nil then
+          table.insert(
+            options,
+            { models = { displayText = "MENU_RESTART_CHECKPOINT_CAPS", action = RestartFromCheckpoint } }
+          )
+        end
+      end
+      if controller == Engine.GetPrimaryController() then
+        table.insert(
+          options,
+          { models = { displayText = "MENU_CHANGE_DIFFICULTY_CAPS", action = OpenDifficultySelect } }
+        )
+      end
+      if CoD.isSafehouse and inTrainingSim == 1 then
+        table.insert(options, { models = { displayText = "MENU_END_TRAINING_SIM", action = EndTrainingSim } })
+      elseif controller == Engine.GetPrimaryController() then
+        if Engine.DvarBool(0, "ui_blocksaves") then
+          table.insert(options, { models = { displayText = "MENU_EXIT_CAPS", action = SaveAndQuitGame } })
+        else
+          table.insert(options, { models = { displayText = "MENU_SAVE_AND_QUIT_CAPS", action = SaveAndQuitGame } })
+        end
+      end
+    elseif CoD.isSafehouse and inTrainingSim == 1 then
+      table.insert(options, { models = { displayText = "MENU_END_TRAINING_SIM", action = EndTrainingSim } })
+    else
+      table.insert(options, { models = { displayText = "MENU_LEAVE_PARTY_AND_EXIT_CAPS", action = QuitGame } })
+    end
+  elseif isMP then
+    if
+      Engine.Team(controller, "name") ~= "TEAM_SPECTATOR" and Engine.GetGametypeSetting("disableClassSelection") ~= 1
+    then
+      table.insert(options, { models = { displayText = "MPUI_CHOOSE_CLASS_BUTTON_CAPS", action = ChooseClass } })
+    end
+    if
+      not Engine.IsVisibilityBitSet(controller, Enum.UIVisibilityBit.BIT_ROUND_END_KILLCAM)
+      and not Engine.IsVisibilityBitSet(controller, Enum.UIVisibilityBit.BIT_FINAL_KILLCAM)
+      and CoD.IsTeamChangeAllowed()
+    then
+      table.insert(options, { models = { displayText = "MPUI_CHANGE_TEAM_BUTTON_CAPS", action = ChooseTeam } })
+    end
+    local endGameText = isLocalHost and "MAIN MENU" or "MENU_QUIT_GAME_CAPS"
+    endGameOption = { models = { displayText = endGameText, action = QuitGame_MP } }
+  elseif isZM then
+    table.insert(options, { models = { displayText = "MENU_RESUMEGAME_CAPS", action = StartMenuGoBack_ListElement } })
+    local endGameText = isLocalHost and "MAIN MENU" or "MENU_QUIT_GAME_CAPS"
+    endGameOption = { models = { displayText = endGameText, action = QuitGame_MP } }
+  end
+  if isLocalHost then
+    addHostOptions(options)
+  end
+  if endGameOption then
+    table.insert(options, endGameOption)
+  end
+  table.insert(options, { models = { displayText = "QUIT TO DESKTOP", action = OpenPCQuit } })
+  BoiiiStartMenuOptionCount = #options
+  return options
+end, true)
+
+-- With a mod loaded, keep the mod's pause menu and only add our host options
+-- after its own, skipping any it already has
+local function appendHostOptions(dataSource)
+  if not dataSource or dataSource.boiiiHostOptions then
+    return
+  end
+  local prepare = dataSource.prepare
+  dataSource.prepare = function(controller, list, filter)
+    prepare(controller, list, filter)
+    local items = list.customDataSourceHelper and list[list.customDataSourceHelper]
+    if not items then
+      return
+    end
+    if isLocalGameHost() then
+      local existing = {}
+      for _, item in ipairs(items) do
+        local displayText = Engine.GetModel(item.model, "displayText")
+        if displayText then
+          existing[Engine.GetModelValue(displayText)] = true
+        end
+      end
+      if existing["MENU_RESTART_LEVEL_CAPS"] or existing["MENU_RESTART_MISSION_CAPS"] then
+        existing["^3RESTART"] = true
+      end
+      local hostOptions = {}
+      addHostOptions(hostOptions)
+      local root = Engine.CreateModel(Engine.GetModelForController(controller), list.customDataSourceHelper)
+      for _, option in ipairs(hostOptions) do
+        if not existing[option.models.displayText] then
+          local index = #items + 1
+          local model = Engine.GetModel(root, index)
+          if model then
+            Engine.UnsubscribeAndFreeModel(model)
+          end
+          model = Engine.CreateModel(root, index)
+          for key, value in pairs(option.models) do
+            Engine.SetModelValue(Engine.CreateModel(model, key), value)
+          end
+          table.insert(items, { model = model, properties = option.properties })
+        end
+      end
+    end
+    BoiiiStartMenuOptionCount = #items
+  end
+  dataSource.boiiiHostOptions = true
+end
+
+-- Keep a stable reference for the pause-menu constructor. BO3 may replace the
+-- table entry while transitioning maps, so the constructor restores it at the
+-- exact point where the menu is created.
+if Engine.IsUsingMods() and Engine.UsingModsUgcName() ~= "" and Engine.UsingModsUgcName() ~= "usermaps" then
+  BoiiiAppendHostOptions = appendHostOptions
+  appendHostOptions(DataSources.StartMenuGameOptions)
+else
+  BoiiiStartMenuGameOptions = customStartMenuGameOptions
+  DataSources.StartMenuGameOptions = BoiiiStartMenuGameOptions
+end
