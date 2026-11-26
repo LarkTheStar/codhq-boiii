@@ -1,0 +1,172 @@
+name: Sync upstream
+
+# Ezz's client moves on its own schedule and our patches sit on top of it. Every
+# night this looks for new upstream commits, merges them on a branch, builds that
+# merge with the same toolchain the release uses, and only then opens a pull
+# request. A merge that does not build never becomes a pull request: it becomes an
+# issue, with the branch kept for whoever resolves it. Nothing is merged into main
+# automatically, because our patches touch offsets and the merge has to be read.
+
+on:
+  schedule:
+    - cron: "41 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+env:
+  UPSTREAM_REPOSITORY: Ezz-lol/boiii-free
+  UPSTREAM_BRANCH: main
+  SYNC_BRANCH: sync/upstream
+
+jobs:
+  sync:
+    name: Merge and build upstream
+    runs-on: windows-latest
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          fetch-depth: 0
+          lfs: false
+
+      - name: Merge the upstream branch
+        id: merge
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "codhq-bot"
+          git config user.email "codhq-bot@users.noreply.github.com"
+          git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
+          git fetch upstream "${UPSTREAM_BRANCH}" --tags
+          if git merge-base --is-ancestor "upstream/${UPSTREAM_BRANCH}" HEAD; then
+            echo "This fork already contains upstream/${UPSTREAM_BRANCH}."
+            echo "state=current" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "count=$(git rev-list --count "HEAD..upstream/${UPSTREAM_BRANCH}")" >> "$GITHUB_OUTPUT"
+          git switch -C "${SYNC_BRANCH}"
+          if git merge --no-edit "upstream/${UPSTREAM_BRANCH}"; then
+            git submodule update --init --recursive
+            echo "state=merged" >> "$GITHUB_OUTPUT"
+          else
+            git diff --name-only --diff-filter=U > upstream-conflicts.txt || true
+            git merge --abort
+            echo "state=conflict" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup LLVM
+        if: steps.merge.outputs.state == 'merged'
+        uses: ZhongRuoyu/setup-llvm@v0
+        with:
+          llvm-version: 23
+
+      - name: Install premake5
+        if: steps.merge.outputs.state == 'merged'
+        uses: Jarod42/install-premake5@v7
+        with:
+          msdev: vs2026
+          ref: v5.0.0
+
+      - name: Generate the build files
+        if: steps.merge.outputs.state == 'merged'
+        run: premake5 ninja
+
+      - name: Build the merged tree
+        id: build
+        if: steps.merge.outputs.state == 'merged'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ninja Release_x64 -Cbuild 2>&1 | tee upstream-build.log
+
+      - name: Keep the merged branch
+        if: steps.merge.outputs.state == 'merged'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git push --force origin "HEAD:${SYNC_BRANCH}"
+
+      - name: Open a pull request for a merge that builds
+        if: steps.merge.outputs.state == 'merged' && steps.build.outcome == 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          {
+            echo "Ezz-lol/boiii-free moved on by ${{ steps.merge.outputs.count }} commit(s); this branch is that upstream branch merged into \`main\`, and it builds Release x64 with the release toolchain."
+            echo
+            echo "Read the merge: our patches touch game offsets, so a clean merge is not proof that the client still matches the game."
+            echo
+            echo '```'
+            git log --oneline "HEAD~${{ steps.merge.outputs.count }}..HEAD" | head -40
+            echo '```'
+          } > pull-request.md
+          if [ -n "$(gh pr list --head "${SYNC_BRANCH}" --state open --json number --jq '.[0].number')" ]; then
+            gh pr edit "${SYNC_BRANCH}" --body-file pull-request.md
+            echo "Updated the open pull request."
+          else
+            gh pr create --base main --head "${SYNC_BRANCH}" \
+              --title "Merge upstream ${UPSTREAM_REPOSITORY}" \
+              --body-file pull-request.md
+          fi
+
+      - name: Report a merge that does not build
+        if: steps.merge.outputs.state == 'merged' && steps.build.outcome != 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="Upstream merge does not build"
+          {
+            echo "The nightly merge of \`${UPSTREAM_REPOSITORY}\` (${SYNC_BRANCH}, ${{ steps.merge.outputs.count }} commit(s)) does not build. The branch is pushed; resolve it there and open a pull request by hand when it is green."
+            echo
+            echo '```'
+            tail -60 upstream-build.log
+            echo '```'
+          } > issue.md
+          existing="$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number')"
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body-file issue.md
+          else
+            gh issue create --title "${title}" --body-file issue.md
+          fi
+
+      - name: Report a merge that conflicts
+        if: steps.merge.outputs.state == 'conflict'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          title="Upstream merge has conflicts"
+          {
+            echo "The nightly merge of \`${UPSTREAM_REPOSITORY}\` conflicts with our patches. Resolve it by hand:"
+            echo
+            echo '```'
+            echo "git fetch upstream && git switch -c sync/upstream && git merge upstream/main"
+            echo '```'
+            echo
+            echo "Conflicted files:"
+            echo
+            echo '```'
+            cat upstream-conflicts.txt
+            echo '```'
+          } > issue.md
+          existing="$(gh issue list --state open --search "${title} in:title" --json number --jq '.[0].number')"
+          if [ -n "${existing}" ]; then
+            gh issue comment "${existing}" --body-file issue.md
+          else
+            gh issue create --title "${title}" --body-file issue.md
+          fi
