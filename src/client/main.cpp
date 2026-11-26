@@ -17,6 +17,7 @@
 #include <steam/steam.hpp>
 #include <steam/voice.hpp>
 
+#include "client_binary.hpp"
 #include "component/updater.hpp"
 #include "launcher/html/html_window.hpp"
 #include "launcher/launcher.hpp"
@@ -115,106 +116,13 @@ void remove_crash_file() {
   utils::io::remove_file(game_path);
 }
 
-constexpr uint32_t SUPPORTED_CLIENT_CHECKSUM = 0x6531394;
-
-enum class client_binary_state : uint8_t {
-  supported,
-  incompatible,
-  unreadable,
-};
-
-std::optional<uint32_t> get_pe_checksum(const std::filesystem::path &file) {
-  std::ifstream stream(file, std::ios::binary);
-  if (stream.is_open()) {
-    IMAGE_DOS_HEADER dos_header{};
-    stream.read(reinterpret_cast<char *>(&dos_header), sizeof(dos_header));
-    if (stream && dos_header.e_magic == IMAGE_DOS_SIGNATURE) {
-      stream.seekg(dos_header.e_lfanew, std::ios::beg);
-
-      uint32_t signature = 0;
-      stream.read(reinterpret_cast<char *>(&signature), sizeof(signature));
-      if (stream && signature == IMAGE_NT_SIGNATURE) {
-        IMAGE_FILE_HEADER file_header{};
-        stream.read(reinterpret_cast<char *>(&file_header),
-                    sizeof(file_header));
-        if (stream) {
-          WORD optional_magic = 0;
-          stream.read(reinterpret_cast<char *>(&optional_magic),
-                      sizeof(optional_magic));
-          if (stream) {
-            stream.seekg(-static_cast<std::streamoff>(sizeof(optional_magic)),
-                         std::ios::cur);
-
-            if (optional_magic == IMAGE_NT_OPTIONAL_HDR64_MAGIC) {
-              IMAGE_OPTIONAL_HEADER64 optional_header{};
-              stream.read(reinterpret_cast<char *>(&optional_header),
-                          sizeof(optional_header));
-              if (stream) {
-                return optional_header.CheckSum;
-              }
-            }
-
-            if (optional_magic == IMAGE_NT_OPTIONAL_HDR32_MAGIC) {
-              IMAGE_OPTIONAL_HEADER32 optional_header{};
-              stream.read(reinterpret_cast<char *>(&optional_header),
-                          sizeof(optional_header));
-              if (stream) {
-                return optional_header.CheckSum;
-              }
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return std::nullopt;
-}
-
-client_binary_state
-classify_client_binary(const std::filesystem::path &client_binary) {
-  const std::optional<uint32_t> checksum = get_pe_checksum(client_binary);
-  if (!checksum.has_value()) {
-    return client_binary_state::unreadable;
-  }
-
-  if (*checksum == SUPPORTED_CLIENT_CHECKSUM) {
-    return client_binary_state::supported;
-  }
-
-  return client_binary_state::incompatible;
-}
-
 constexpr const char MANUAL_CLIENT_PATCH_MESSAGE[] =
     "Incompatible game version detected:\n"
-    "The installed BlackOps3.exe version is not compatible with this "
-    "BOIII build.\n"
-    "This usually happens because Black Ops 3 was updated and BOIII "
-    "needs the older compatible BlackOps3.exe version.\n"
-    "To fix this, download the compatible BlackOps3.exe and replace the "
-    "one in your game directory.\n"
-    "You can find a download link under Settings => Patches.";
-
-void ensure_compatible_client_binary(
-    const std::filesystem::path &client_binary) {
-  const client_binary_state state = classify_client_binary(client_binary);
-  switch (state) {
-  case client_binary_state::supported:
-    break;
-  case client_binary_state::unreadable:
-    throw std::runtime_error("BlackOps3.exe could not be read. Check that the "
-                             "game folder is complete, "
-                             "then verify the game files in Steam.");
-  case client_binary_state::incompatible:
-    throw std::runtime_error(
-        "This BlackOps3.exe is not the game build CodHQ BOIII supports. CodHQ "
-        "BOIII "
-        "never replaces your game executable: in Steam, right-click Black Ops "
-        "III, "
-        "open Properties > Installed Files and choose Verify integrity of game "
-        "files, then start again.");
-  }
-}
+    "The game executable that was loaded is not the build this BOIII build "
+    "supports (PE checksum 0x6531394).\n"
+    "Start again and press OK on the patch prompt to install the compatible "
+    "BlackOps3.exe, or open Settings => Patches to install it.\n"
+    "Your own file is kept as BlackOps3.exe.boiii_backup.";
 
 PIMAGE_TLS_CALLBACK *get_tls_callbacks() {
   const utils::nt::library game{};
@@ -828,7 +736,7 @@ int main(int argc, char *argv[]) {
           return 0;
         }
 
-        ensure_compatible_client_binary(client_binary);
+        ::client_binary::ensure_compatible(client_binary);
       }
 
       if (!component_loader::activate(is_server)) {

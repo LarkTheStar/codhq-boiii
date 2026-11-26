@@ -4,9 +4,11 @@
 #include <utils/http.hpp>
 #include <utils/io.hpp>
 #include <utils/nt.hpp>
+#include <utils/progress_ui.hpp>
 #include <utils/properties.hpp>
 #include <utils/string.hpp>
 
+#include "client_binary.hpp"
 #include "component/auth.hpp"
 #include "component/workshop/workshop.hpp"
 #include "html/html_window.hpp"
@@ -1539,6 +1541,36 @@ bool run() {
                         SW_SHOWNORMAL);
 
           return {};
+        });
+
+    window.get_html_frame()->register_callback(
+        "installCompatibleClient",
+        [](const std::vector<html_argument> & /*params*/) -> CComVariant {
+          const std::filesystem::path binary = "BlackOps3.exe";
+
+          switch (client_binary::classify(binary)) {
+          case client_binary::state::supported:
+            return CComVariant("supported");
+          case client_binary::state::unreadable:
+            return CComVariant("unreadable");
+          case client_binary::state::incompatible:
+            break;
+          }
+
+          // The progress window owns the modal, so the page is not blocked.
+          std::thread([] {
+            try {
+              client_binary::install("BlackOps3.exe", true);
+            } catch (const std::exception &e) {
+              utils::progress_ui::show_error("BOIII Patch Installer", e.what());
+            } catch (...) {
+              utils::progress_ui::show_error("BOIII Patch Installer",
+                                             "The compatible BlackOps3.exe "
+                                             "could not be installed.");
+            }
+          }).detach();
+
+          return CComVariant("started");
         });
 
     window.get_html_frame()->register_callback(

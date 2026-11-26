@@ -3200,6 +3200,60 @@
     "settingsPathDisplay",
   ]);
 
+  (function () {
+    var patchBtn = document.getElementById("installCompatibleClientBtn");
+    var patchStatus = document.getElementById("installCompatibleClientStatus");
+    if (!patchBtn) return;
+
+    patchBtn.onclick = function () {
+      var ex = getExternal();
+      if (!ex || !ex.installCompatibleClient) {
+        if (patchStatus)
+          patchStatus.textContent =
+            "This launcher cannot install the executable; use the manual link below.";
+        return;
+      }
+
+      patchBtn.disabled = true;
+      if (patchStatus) patchStatus.textContent = "Checking BlackOps3.exe...";
+
+      var result = "";
+      try {
+        result = String(ex.installCompatibleClient());
+      } catch (e) {
+        result = "error";
+      }
+
+      if (result === "supported") {
+        if (patchStatus)
+          patchStatus.textContent =
+            "Your BlackOps3.exe is already the compatible build (PE checksum 0x6531394).";
+        patchBtn.disabled = false;
+        return;
+      }
+
+      if (result === "unreadable") {
+        if (patchStatus)
+          patchStatus.textContent =
+            "BlackOps3.exe could not be read. Check the game folder, then verify the game files in Steam.";
+        patchBtn.disabled = false;
+        return;
+      }
+
+      if (result === "started") {
+        if (patchStatus)
+          patchStatus.textContent =
+            "Download started in the patch installer window. Your current file is backed up first.";
+        return;
+      }
+
+      if (patchStatus)
+        patchStatus.textContent =
+          "The patch installer is not available in this build; use the manual link below.";
+      patchBtn.disabled = false;
+    };
+  })();
+
   var settingsTabs = document.querySelectorAll(".settings-tab");
   var settingsTabContents = document.querySelectorAll(".settings-tab-content");
   for (var sti = 0; sti < settingsTabs.length; sti++) {
