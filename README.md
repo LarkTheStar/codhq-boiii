@@ -26,6 +26,22 @@ Our own build of the community BOIII client, made for the Call of Duty HQ setup 
 - The installer pins one release of this client by size and SHA-256; a new tag needs that
   pin updated in `install.ps1` of the setup utility.
 
+## Keeping up with upstream
+
+Ezz's client keeps moving, so `.github/workflows/sync-upstream.yml` runs every night:
+
+- It fetches `Ezz-lol/boiii-free` and, when it has new commits, merges them into the
+  `sync/upstream` branch and builds `Release_x64` with the release toolchain.
+- A merge that builds becomes a pull request. Nothing lands on `main` by itself: our
+  patches carry game offsets, so a clean merge still has to be read and tested against
+  the game before it is released.
+- A merge that conflicts, or that does not build, becomes an issue with the conflicted
+  files or the end of the build log. The branch stays pushed so the work is not lost.
+- Run it early with `gh workflow run sync-upstream.yml` when upstream announces a change.
+
+After merging a sync, rebuild, recheck the offsets and Arxan handling, and publish a new
+`v*` tag; that tag is what updates installed clients and what the installer pins.
+
 ---
 
 # Ezz BOIII ☄️: Call of Duty® Black Ops III Client
@@ -425,6 +441,31 @@ zone/zm_zod_patch.ff
 ## Compile from Source
 
 Want to build Ezz BOIII yourself? Here's how! 🔨
+
+### Windows prerequisites this fork needed
+
+`generate.bat` installs premake5 if it is missing, then generates the project files;
+`premake5 ninja` and `ninja Release_x64 -Cbuild` build the same way CI does. Beyond
+Visual Studio's **Desktop development with C++** workload, a full build here needed:
+
+- **ATL** (`atlbase.h`, `atls.lib`): the *C++ ATL for latest v143 build tools* component.
+  Without it, `com.hpp` stops at `atlbase.h`. It can be added without admin rights with
+  `vs_BuildTools.exe --layout <dir> --add Microsoft.VisualStudio.Component.VC.ATL`, then
+  pointing `INCLUDE`/`LIB` at the extracted `atlmfc` folder.
+- **`llvm-windres`**: `premake/module/llvm.lua` calls it, and the LLVM Windows package
+  does not always ship it next to `clang-cl`. `llvm-rc` does ship, and it is what CI
+  uses; a small wrapper that maps `-i/-o/-D/-I` onto `llvm-rc`'s `/fo /d /I` is enough.
+- **The SDK's `winrt` include**: WebView2 needs `EventToken.h`, which lives in
+  `Windows Kits\10\Include\<version>\winrt` and is not in the default `INCLUDE`.
+
+A clean checkout of the submodules is required: a shallow clone leaves
+`deps/rapidjson/thirdparty/gtest` pointing at a commit that is not in the shallow
+history, and generation fails. Build from the command line with standard input
+closed (`ninja Release_x64 -Cbuild < /dev/null`); Ninja otherwise fails with
+`ReadFile: The handle is invalid` when it is started from some shells.
+
+The release build links with `/Brepro`, so the same sources and the same toolchain
+produce the same bytes; that is what lets the installer pin one published build.
 
 ### Prerequisites
 
