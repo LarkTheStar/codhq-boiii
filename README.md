@@ -7,6 +7,8 @@ Our own build of the community BOIII client, made for the Call of Duty HQ setup 
 - The source is the BOIII project originally by momo5502 and X Labs, continued by
   AlterWare and by Ezz (`Ezz-lol/boiii-free`). Their credits below still apply; this
   fork adds our own fixes and packaging, under GPL-3.0 (see `LICENSE`).
+- It never replaces the player's `BlackOps3.exe`: a game build the client cannot load gets
+  a message that points at Steam's Verify integrity, and the file stays as it was.
 - It loads into the player's own `BlackOps3.exe`. The client build a game must match has
   the PE header checksum `0x6531394`; the unranked dedicated server's is `0x14C28B4`.
 - Server browser, lobbies and players use the community master servers, not ours. Only
