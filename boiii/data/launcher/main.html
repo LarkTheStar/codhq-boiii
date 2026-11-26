@@ -2787,7 +2787,7 @@
                 data-stab="patches"
               >
                 <div class="settings-section">
-                  <div class="settings-section-title">Steam Update Fix</div>
+                  <div class="settings-section-title">Game executable</div>
                   <div
                     style="
                       display: flex;
@@ -2801,29 +2801,51 @@
                   >
                     <div>
                       <div class="settings-row-label">
-                        Previous BlackOps3.exe
+                        Compatible BlackOps3.exe (Sept 10, 2026)
                       </div>
                       <div class="settings-row-desc" style="margin-top: 4px">
-                        BOIII does not work with the latest Steam update. If you
-                        downloaded the latest update through Steam, use the
-                        button below to get the previous BlackOps3.exe and
-                        replace the one in your game directory.
+                        CodHQ BOIII loads the Black Ops 3 build with PE checksum
+                        <strong>0x6531394</strong> (the unranked dedicated
+                        server's is <strong>0x14C28B4</strong>). When Steam
+                        updates the game, the client offers to install the
+                        compatible executable before it starts. The installer
+                        downloads it from our mirror, checks its SHA-1
+                        (<code>9D03F810...3B9B</code>) and PE checksum, and
+                        keeps your current file as
+                        <code>BlackOps3.exe.boiii_backup</code>.
                       </div>
                     </div>
                     <button
                       type="button"
                       class="btn btn-primary"
                       style="margin-top: 20px"
-                      onclick="
-                        window
-                          .getExternal()
-                          .openUrl(
-                            'https://archive.org/download/t7_full_game/BlackOps3.exe'
-                          )
-                      "
+                      id="installCompatibleClientBtn"
                     >
-                      Download Previous BlackOps3.exe
+                      Download and install compatible BlackOps3.exe
                     </button>
+                    <div
+                      class="settings-row-desc"
+                      id="installCompatibleClientStatus"
+                      style="margin-top: 4px"
+                    ></div>
+                    <div class="settings-row-desc">
+                      Manual fallback:
+                      <a
+                        href="https://archive.org/download/black-ops-3_20260926/BlackOps3.exe"
+                        class="bb-link"
+                        onclick="
+                          try {
+                            window.getExternal().openUrl(this.href);
+                          } catch (e) {}
+                          return false;
+                        "
+                        >BlackOps3.exe (106,059,256 bytes)</a
+                      >. To put your own copy back, rename
+                      <code>BlackOps3.exe.boiii_backup</code> to
+                      <code>BlackOps3.exe</code>; to get the Steam copy back,
+                      use Properties &gt; Installed Files &gt; Verify integrity
+                      of game files.
+                    </div>
                   </div>
                 </div>
               </div>
