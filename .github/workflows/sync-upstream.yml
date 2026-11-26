@@ -46,7 +46,11 @@ jobs:
           git config user.name "codhq-bot"
           git config user.email "codhq-bot@users.noreply.github.com"
           git remote add upstream "https://github.com/${UPSTREAM_REPOSITORY}.git"
-          git fetch upstream "${UPSTREAM_BRANCH}" --tags
+          # Fetch the branch by its full ref name: upstream also carries a tag called
+          # "main", and a short refspec matches the tag instead of the branch, which
+          # leaves no upstream/main to merge. Tags are not fetched either: a nightly
+          # merge needs the branch, and our own v* tags must not be overwritten.
+          git fetch --no-tags upstream "+refs/heads/${UPSTREAM_BRANCH}:refs/remotes/upstream/${UPSTREAM_BRANCH}"
           if git merge-base --is-ancestor "upstream/${UPSTREAM_BRANCH}" HEAD; then
             echo "This fork already contains upstream/${UPSTREAM_BRANCH}."
             echo "state=current" >> "$GITHUB_OUTPUT"
@@ -59,7 +63,7 @@ jobs:
             echo "state=merged" >> "$GITHUB_OUTPUT"
           else
             git diff --name-only --diff-filter=U > upstream-conflicts.txt || true
-            git merge --abort
+            git merge --abort || true
             echo "state=conflict" >> "$GITHUB_OUTPUT"
           fi
 
