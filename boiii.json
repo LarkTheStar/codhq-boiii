@@ -1,8 +1,8 @@
 [
  [
   "boiii.exe",
-  7708160,
-  "C27E036593C52D4E3B920221D5646136E31C6167"
+  7727104,
+  "485D523518F11A4EE9041B70EC0FC5D4B8199524"
  ],
  [
   "data/custom_scripts/mp/custom_bots.gsc",
@@ -46,8 +46,8 @@
  ],
  [
   "data/lobby_scripts/server_lobby_selector/__init__.lua",
-  3337,
-  "0F8E231E6FBC32EB12EF1A50981FD53B0A8CB272"
+  4082,
+  "7092EECD8B3A6A6AEAC03A92079A928E69064F4D"
  ],
  [
   "data/lookup_tables/dvar_list.txt",
