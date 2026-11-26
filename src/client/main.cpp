@@ -614,6 +614,42 @@ inline bool initial_update_required() {
       launcher::get_launcher_ui_file().generic_wstring());
 }
 
+// The setup utility seeds this data and the updater refreshes it. If a file
+// the client cannot work without is gone (a half-removed install, a failed
+// update, a folder cleared by hand) the menus it belongs to silently do
+// nothing, which reads as a client bug. Name the missing file and how to get it
+// back instead. This never blocks the launch: a release can drop or rename a
+// file, and refusing to start over a warning would be worse than starting
+// without it.
+void report_missing_data_files() {
+  static constexpr const char *REQUIRED_DATA_FILES[] = {
+      "ui_scripts/frontend_menus/__init__.lua",
+      "lookup_tables/dvar_list.txt",
+  };
+
+  const auto data_path = game::get_data_path();
+  std::string missing;
+  for (const char *file : REQUIRED_DATA_FILES) {
+    if (utils::io::file_exists((data_path / file).generic_wstring())) {
+      continue;
+    }
+    if (!missing.empty()) {
+      missing += ", ";
+    }
+    missing += file;
+  }
+
+  if (missing.empty()) {
+    return;
+  }
+
+  printf("^1[ CodHQ ]^7 The client data in %s is missing %s, so the menus and "
+         "settings that come from it will not work. Install the client again "
+         "from the CodHQ setup utility, or delete that folder and start the "
+         "client with an internet connection so it downloads its data again.\n",
+         data_path.string().c_str(), missing.c_str());
+}
+
 std::wstring quote_process_argument(const std::wstring_view argument) {
   // The engine doesn't run +set or +exec when they're quoted, so only quote
   // what needs it
@@ -783,6 +819,7 @@ int main(int argc, char *argv[]) {
       }
 
       if (!is_server) {
+        report_missing_data_files();
         trigger_high_performance_gpu_switch();
         steam::voice::KeepMixerVolume();
 
