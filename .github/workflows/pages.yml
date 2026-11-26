@@ -42,6 +42,13 @@ jobs:
       - name: Build Release x64
         run: ninja Release_x64 -Cbuild
 
+      - name: Make the built executable reproducible
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f build/bin/x64/Release/boiii.exe
+          python tools/canonicalize-pe.py build/bin/x64/Release/boiii.exe
+
       - name: Stage the update site
         shell: bash
         run: |
@@ -73,8 +80,10 @@ jobs:
           test -f site/boiii.json
 
       - name: Build the full archive
-        shell: pwsh
-        run: Compress-Archive -Path site/boiii/boiii.exe, site/boiii/data -DestinationPath site/codhq-boiii.zip -CompressionLevel Optimal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python tools/make-archive.py site/boiii site/codhq-boiii.zip
 
       - name: Write the site landing page
         shell: bash

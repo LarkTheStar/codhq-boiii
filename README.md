@@ -465,7 +465,14 @@ closed (`ninja Release_x64 -Cbuild < /dev/null`); Ninja otherwise fails with
 `ReadFile: The handle is invalid` when it is started from some shells.
 
 The release build links with `/Brepro`, so the same sources and the same toolchain
-produce the same bytes; that is what lets the installer pin one published build.
+produce the same bytes apart from the linker's timestamp and CodeView GUID.
+`tools/canonicalize-pe.py` clears those two fields in `boiii.exe` (and in the
+`tlsdll.dll` embedded in its resources), and `tools/make-archive.py` writes the
+published ZIP with fixed dates, so a rebuild of a tag gives the same archive and the
+same SHA-256. That is what lets the installer pin one published build: re-running the
+release workflow does not invalidate the pin. Both are plain Python 3 and run in the
+release workflow; run them yourself after a local build if you want to compare it with
+a published one.
 
 ### Prerequisites
 
