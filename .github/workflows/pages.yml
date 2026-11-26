@@ -72,6 +72,10 @@ jobs:
           cp site/boiii.json site/boiii/../boiii.json 2>/dev/null || true
           test -f site/boiii.json
 
+      - name: Build the full archive
+        shell: pwsh
+        run: Compress-Archive -Path site/boiii/boiii.exe, site/boiii/data -DestinationPath site/codhq-boiii.zip -CompressionLevel Optimal
+
       - name: Publish to the gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
