@@ -41,6 +41,11 @@ std::string get_selected_version() {
 }
 
 bool should_skip_host_update() {
+  // -noupdate only holds back boiii.exe: the data files still update, so a
+  // pinned client keeps working with a data tree the server expects.
+  if (utils::flags::has_flag("noupdate")) {
+    return true;
+  }
   return get_selected_version() != "latest" &&
          !(utils::flags::has_flag("beta") && is_dedicated_server());
 }
