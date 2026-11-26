@@ -32,13 +32,13 @@ void draw_branding() {
         game::select(0x1432D2918, 0x1410E1BE0));
 
     game::render::R_AddCmdDrawText(
-        "EZZ: " VERSION, std::numeric_limits<int>::max(), font, X,
+        "CodHQ BOIII " VERSION, std::numeric_limits<int>::max(), font, X,
         Y + static_cast<float>(font[2]) * SCALE, SCALE, SCALE, 0.0f, &color,
         game::itemTextStyle::NORMAL);
   }
 }
 
-const char *get_ingame_console_prefix_stub() { return "EZZ> "; }
+const char *get_ingame_console_prefix_stub() { return "CodHQ> "; }
 } // namespace
 
 struct component final : client_component {
@@ -50,7 +50,7 @@ struct component final : client_component {
       scheduler::loop(draw_branding, scheduler::pipeline::renderer);
 
       // Change window title prefix
-      utils::hook::copy_string(game::select(0x142FC02D8, 0x0), "EZZ");
+      utils::hook::copy_string(game::select(0x142FC02D8, 0x0), "CodHQ");
 
       // Change ingame console prefix
       utils::hook::call(game::con::Con_DrawInput.offset(0x90),
