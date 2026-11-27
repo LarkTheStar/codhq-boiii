@@ -198,7 +198,11 @@ public:
         "Print every asset that couldn't be found");
 
     if (game::is_client()) {
-      warn_if_mode_data_missing();
+      // The console and the game path are ready a few frames in, so say it
+      // there rather than during component init.
+      scheduler::once([] { warn_if_mode_data_missing(); },
+                      scheduler::pipeline::main,
+                      std::chrono::milliseconds(3000));
       command::add("DB_FreeUnusedResources", [](const command::params &params) {
         if (!workshop::are_xzones_loading()) {
           game::db::load::DB_FreeUnusedResources(std::atoi(params.get(1)) != 0,
