@@ -3680,3 +3680,11 @@ body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::aft
   padding: 9px 6px;
   font-size: 0.66rem;
 }
+
+/* The full-width button is an inline-flex box, so in a popup it sat at the left
+   edge of a narrower line and its label read as off-centre. */
+.codhq-welcome .btn-full {
+  display: flex;
+  margin-left: auto;
+  margin-right: auto;
+}
