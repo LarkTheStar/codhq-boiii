@@ -4568,15 +4568,40 @@
 
   function versionTagFromStored(value) {
     if (!value) return value;
+    if (value.indexOf("ezz:") === 0) return value;
     var tag = value;
     if (tag.indexOf("boiii-") === 0) tag = tag.substring("boiii-".length);
     if (tag.slice(-4) === ".exe") tag = tag.slice(0, -4);
     return tag;
   }
 
+  function isCreatorVersion(value) {
+    return typeof value === "string" && value.indexOf("ezz:") === 0;
+  }
+
+  function versionLabel(value) {
+    if (value === "latest") return getLatestLabel();
+    if (isCreatorVersion(value))
+      return "Ezz " + value.substring("ezz:".length) + " (original build)";
+    return value;
+  }
+
+  function setVersionDisplayStyle(value) {
+    if (!verDropDisplay) return;
+    var external = isCreatorVersion(value);
+    verDropDisplay.className =
+      "version-selector-display" + (external ? " external" : "");
+    verDropDisplay.title = external
+      ? "An original Ezz build, not a CodHQ build: none of our fixes or branding apply."
+      : value === "latest"
+        ? "Always the newest CodHQ build; the client updates itself on launch."
+        : "This CodHQ build keeps its executable; the client's data files still update.";
+  }
+
   function selectVersion(value, label) {
     _selectedVersion = value;
     if (verDropText) verDropText.textContent = label;
+    setVersionDisplayStyle(value);
     if (versionOptions) {
       var opts = versionOptions.querySelectorAll(".version-selector-option");
       for (var i = 0; i < opts.length; i++) {
@@ -4627,8 +4652,8 @@
 
   function getLatestLabel() {
     return _latestVersionTag
-      ? _latestVersionTag + " (Latest)"
-      : "Latest (Auto-update)";
+      ? _latestVersionTag + " (Latest, auto-update)"
+      : "Latest (auto-update)";
   }
 
   if (versionOptions) {
@@ -4658,85 +4683,231 @@
   });
 
   try {
-    var sv =
+    var storedVersion =
       getExternal() &&
       getExternal().getSelectedVersion &&
       getExternal().getSelectedVersion();
-    if (sv) {
-      _selectedVersion = versionTagFromStored(sv);
-
-      var initialLabel = getLatestLabel();
-      if (_selectedVersion === "beta") initialLabel = "Beta (Experimental)";
-      else if (_selectedVersion !== "latest") initialLabel = _selectedVersion;
-      selectVersion(_selectedVersion, initialLabel);
+    if (storedVersion) {
+      _selectedVersion = versionTagFromStored(storedVersion) || "latest";
+      selectVersion(_selectedVersion, versionLabel(_selectedVersion));
     }
   } catch (e) {}
 
-  function fetchReleases() {
-    if (!versionOptions) return;
+  var CODHQ_SITE = "https://larkthestar.github.io/codhq-boiii/";
+  var CREATOR_RELEASES_API =
+    "https://api.github.com/repos/Ezz-lol/boiii-free/releases?per_page=30";
 
-    var url = "https://api.github.com/repos/Ezz-lol/boiii-free/releases";
+  function applySelectedVersionLabel() {
+    var value = _selectedVersion || "latest";
+    selectVersion(value, versionLabel(value));
+  }
+
+  // Our versions come from our own site: versions.json lists the GitHub releases
+  // this repository publishes, so the selector can only ever name CodHQ builds.
+  function fetchVersions() {
+    if (!versionOptions) return;
     var xhr = new XMLHttpRequest();
-    xhr.open("GET", url, true);
+    xhr.open("GET", CODHQ_SITE + "versions.json?" + Date.now(), true);
     xhr.onreadystatechange = function () {
       if (xhr.readyState !== 4) return;
-
-      if (xhr.status === 200) {
-        try {
-          var releases = JSON.parse(xhr.responseText);
-          if (releases && Array.isArray(releases) && releases.length) {
-            _latestVersionTag = releases[0].tag_name;
-            var defaultOptEl = versionOptions.querySelector(
-              '.version-selector-option[data-value="latest"]'
-            );
-            if (defaultOptEl) {
-              defaultOptEl.textContent = getLatestLabel();
-            }
-          }
-          if (releases && Array.isArray(releases)) {
-            for (var i = 0; i < releases.length; i++) {
-              var rel = releases[i];
-              var tagName = rel.tag_name;
-              var assets = rel.assets || [];
-              var boiiiAsset = null;
-              for (var j = 0; j < assets.length; j++) {
-                if (assets[j].name === "boiii.exe") {
-                  boiiiAsset = assets[j];
-                  break;
-                }
-              }
-              if (boiiiAsset) {
-                _versionsData[tagName] = {
-                  url: boiiiAsset.browser_download_url,
-                  name: "versions/boiii-" + tagName + ".exe",
-                };
-                // The newest release is already represented by the Latest
-                // entry, so skip adding it a second time as its own row.
-                if (tagName !== _latestVersionTag) {
-                  addVersionOption(tagName, tagName);
-                }
-              }
-            }
-          }
-          // After loading all versions, ensure UI reflects saved selection
-          var label = getLatestLabel();
-          if (_selectedVersion === "beta") label = "Beta (Experimental)";
-          else if (_selectedVersion !== "latest") label = _selectedVersion;
-          selectVersion(_selectedVersion, label);
-        } catch (e) {
-          console.error("Error parsing releases:", e);
-        }
-      } else {
-        console.error("Error fetching releases:", xhr.status, xhr.statusText);
+      if (xhr.status !== 200) {
+        console.warn("CodHQ version list unavailable:", xhr.status);
+        applySelectedVersionLabel();
+        return;
       }
+      var versions = [];
+      try {
+        versions = JSON.parse(xhr.responseText) || [];
+      } catch (e) {
+        console.error("Error parsing versions.json:", e);
+      }
+      if (!Array.isArray(versions) || !versions.length) {
+        applySelectedVersionLabel();
+        return;
+      }
+      _latestVersionTag = versions[0].tag || "";
+      var latestOption = versionOptions.querySelector(
+        '.version-selector-option[data-value="latest"]'
+      );
+      if (latestOption) latestOption.textContent = getLatestLabel();
+      for (var i = 1; i < versions.length; i++) {
+        var entry = versions[i] || {};
+        if (!entry.tag || !entry.url) continue;
+        _versionsData[entry.tag] = {
+          url: entry.url,
+          name: "versions/boiii-" + entry.tag + ".exe",
+        };
+        addVersionOption(entry.tag, entry.tag);
+      }
+      applySelectedVersionLabel();
     };
     xhr.send();
   }
 
-  // CodHQ: the version selector and EZZ's release list are gone on purpose. This
-  // build is published and updated by us, so Play always runs the CodHQ client and
-  // the launcher never asks EZZ's GitHub or r2.ezz.lol for a build.
-  _selectedVersion = "latest";
+  var creatorBuildsPopup = document.getElementById("creatorBuilds");
+  var creatorBuildsList = document.getElementById("ezzVersionOptions");
+  var creatorBuildsLoaded = false;
+
+  function showCreatorBuildsStatus(text) {
+    if (!creatorBuildsList) return;
+    creatorBuildsList.innerHTML = "";
+    var status = document.createElement("div");
+    status.className = "creator-builds-status";
+    status.textContent = text;
+    creatorBuildsList.appendChild(status);
+  }
+
+  function formatMegabytes(bytes) {
+    if (!bytes) return "";
+    return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+  }
+
+  function addCreatorBuild(entry) {
+    var row = document.createElement("div");
+    row.className = "creator-build-row";
+
+    var info = document.createElement("div");
+    info.className = "creator-build-info";
+    var tag = document.createElement("div");
+    tag.className = "creator-build-tag";
+    tag.textContent = entry.tag;
+    var meta = document.createElement("div");
+    meta.className = "creator-build-meta";
+    meta.textContent =
+      (entry.size ? formatMegabytes(entry.size) + " \u00b7 " : "") +
+      "from Ezz's GitHub";
+    info.appendChild(tag);
+    info.appendChild(meta);
+
+    var use = document.createElement("button");
+    use.type = "button";
+    use.className = "btn creator-build-use";
+    use.textContent = "Use";
+    use.onclick = function () {
+      var value = "ezz:" + entry.tag;
+      _versionsData[value] = {
+        url: entry.url,
+        name: "versions/boiii-ezz-" + entry.tag + ".exe",
+      };
+      selectVersion(value, versionLabel(value));
+      closeCreatorBuilds();
+    };
+
+    row.appendChild(info);
+    row.appendChild(use);
+    creatorBuildsList.appendChild(row);
+  }
+
+  // Ezz's own releases, listed apart from the CodHQ selector on purpose.
+  function fetchCreatorBuilds() {
+    if (!creatorBuildsList || creatorBuildsLoaded) return;
+    showCreatorBuildsStatus("Loading Ezz's releases\u2026");
+    var xhr = new XMLHttpRequest();
+    xhr.open("GET", CREATOR_RELEASES_API + "&_" + Date.now(), true);
+    xhr.onreadystatechange = function () {
+      if (xhr.readyState !== 4) return;
+      if (xhr.status !== 200) {
+        showCreatorBuildsStatus(
+          "Ezz's release list could not be loaded (" + xhr.status + ")."
+        );
+        return;
+      }
+      var releases = [];
+      try {
+        releases = JSON.parse(xhr.responseText) || [];
+      } catch (e) {
+        console.error("Error parsing Ezz's releases:", e);
+      }
+      creatorBuildsList.innerHTML = "";
+      var shown = 0;
+      for (var i = 0; i < releases.length; i++) {
+        var release = releases[i] || {};
+        var assets = release.assets || [];
+        var asset = null;
+        for (var j = 0; j < assets.length; j++) {
+          if (assets[j] && assets[j].name === "boiii.exe") {
+            asset = assets[j];
+            break;
+          }
+        }
+        if (!asset || !release.tag_name) continue;
+        addCreatorBuild({
+          tag: release.tag_name,
+          url: asset.browser_download_url,
+          size: asset.size,
+        });
+        shown++;
+      }
+      if (!shown) {
+        showCreatorBuildsStatus(
+          "Ezz's GitHub has no release with a boiii.exe download right now."
+        );
+        return;
+      }
+      creatorBuildsLoaded = true;
+    };
+    xhr.send();
+  }
+
+  function openCreatorBuilds() {
+    if (!creatorBuildsPopup) return;
+    creatorBuildsPopup.classList.add("active");
+    fetchCreatorBuilds();
+  }
+
+  function closeCreatorBuilds() {
+    if (creatorBuildsPopup) creatorBuildsPopup.classList.remove("active");
+  }
+
+  var creatorBuildsBtn = document.getElementById("creatorBuildsBtn");
+  if (creatorBuildsBtn) creatorBuildsBtn.onclick = openCreatorBuilds;
+  var creatorBuildsClose = document.getElementById("creatorBuildsClose");
+  if (creatorBuildsClose) creatorBuildsClose.onclick = closeCreatorBuilds;
+  var creatorBuildsBack = document.getElementById("creatorBuildsBack");
+  if (creatorBuildsBack) {
+    creatorBuildsBack.onclick = function () {
+      selectVersion("latest", getLatestLabel());
+      closeCreatorBuilds();
+    };
+  }
+  if (creatorBuildsPopup) {
+    creatorBuildsPopup.onclick = function (e) {
+      if (e.target === creatorBuildsPopup) closeCreatorBuilds();
+    };
+  }
+
+  // Links open through the launcher's bridge, with a browser fallback, so a link
+  // button is never dead when the bridge is not there.
+  function openExternalUrl(url) {
+    try {
+      var ex = getExternal();
+      if (ex && ex.openUrl) {
+        ex.openUrl(url);
+        return;
+      }
+    } catch (e) {}
+    try {
+      window.open(url, "_blank");
+    } catch (e) {}
+  }
+  window.openExternalUrl = openExternalUrl;
+
+  document.addEventListener("click", function (e) {
+    var target = e.target;
+    while (target && target !== document.body) {
+      if (target.getAttribute && target.getAttribute("data-url")) {
+        e.preventDefault();
+        openExternalUrl(target.getAttribute("data-url"));
+        return;
+      }
+      target = target.parentNode;
+    }
+  });
+
+  // The selector starts on Latest and fills in from our own site; a failed fetch
+  // leaves it exactly as it looks today.
+  _selectedVersion = _selectedVersion || "latest";
+  fetchVersions();
 
   /* CodHQ: the first-run note. Shown once per WebView profile, then remembered. */
   (function codhqWelcome() {

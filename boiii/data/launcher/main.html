@@ -273,11 +273,36 @@
                   &#9654; PLAY
                 </button>
                 <div class="version-selector-wrap">
-                  <span class="version-selector-label">Updates:</span>
-                  <span class="codhq-channel"
-                    >CodHQ (auto-update from our site)</span
-                  >
+                  <span class="version-selector-label">Version:</span>
+                  <div class="version-selector-container" id="versionDropdown">
+                    <button
+                      type="button"
+                      class="version-selector-display"
+                      id="verDropDisplay"
+                    >
+                      <span class="version-selector-text" id="verDropText"
+                        >Latest (auto-update)</span
+                      >
+                      <span class="version-selector-arrow">&#9660;</span>
+                    </button>
+                    <div class="version-selector-options" id="versionOptions">
+                      <div
+                        class="version-selector-option selected"
+                        data-value="latest"
+                      >
+                        Latest (auto-update)
+                      </div>
+                    </div>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  class="version-link"
+                  id="creatorBuildsBtn"
+                  title="Releases of the original client by Ezz, untouched"
+                >
+                  Builds from the original creator&hellip;
+                </button>
               </div>
               <div class="player-section">
                 <div class="player-label">Player Name</div>
@@ -324,11 +349,7 @@
                   type="button"
                   class="btn btn-codhq"
                   title="Our fork's source and releases"
-                  onclick="
-                    window
-                      .getExternal()
-                      .openUrl('https://github.com/LarkTheStar/codhq-boiii')
-                  "
+                  data-url="https://github.com/LarkTheStar/codhq-boiii"
                 >
                   CodHQ GitHub
                 </button>
@@ -336,11 +357,7 @@
                   type="button"
                   class="btn btn-codhq"
                   title="Where this build and its updates come from"
-                  onclick="
-                    window
-                      .getExternal()
-                      .openUrl('https://larkthestar.github.io/codhq-boiii/')
-                  "
+                  data-url="https://larkthestar.github.io/codhq-boiii/"
                 >
                   Our site
                 </button>
@@ -348,13 +365,7 @@
                   type="button"
                   class="btn btn-codhq"
                   title="The CodHQ setup utility that installs and updates this client"
-                  onclick="
-                    window
-                      .getExternal()
-                      .openUrl(
-                        'https://github.com/LarkTheStar/fix-installer/releases'
-                      )
-                  "
+                  data-url="https://github.com/LarkTheStar/fix-installer/releases"
                 >
                   Setup utility
                 </button>
@@ -3433,11 +3444,7 @@
             <button
               type="button"
               class="btn btn-full"
-              onclick="
-                window
-                  .getExternal()
-                  .openUrl('https://github.com/LarkTheStar/codhq-boiii')
-              "
+              data-url="https://github.com/LarkTheStar/codhq-boiii"
             >
               CodHQ BOIII on GitHub
             </button>
@@ -3525,8 +3532,10 @@
           <ul>
             <li>
               <strong>Updates come from CodHQ.</strong> This build is published
-              on our own site and updated by the CodHQ Setup Utility, not by the
-              EZZ release list (that list is gone on purpose).
+              on our own site and updated by the CodHQ Setup Utility. The
+              <strong>Version</strong> selector under Play lists our older
+              builds, and "Builds from the original creator" lists Ezz's own
+              releases separately for anyone who wants to compare.
             </li>
             <li>
               The <strong>Discord</strong> button opens the original creator's
@@ -3543,35 +3552,21 @@
             <button
               type="button"
               class="btn btn-codhq"
-              onclick="
-                window
-                  .getExternal()
-                  .openUrl('https://github.com/LarkTheStar/codhq-boiii')
-              "
+              data-url="https://github.com/LarkTheStar/codhq-boiii"
             >
               CodHQ GitHub
             </button>
             <button
               type="button"
               class="btn btn-codhq"
-              onclick="
-                window
-                  .getExternal()
-                  .openUrl('https://larkthestar.github.io/codhq-boiii/')
-              "
+              data-url="https://larkthestar.github.io/codhq-boiii/"
             >
               Our site
             </button>
             <button
               type="button"
               class="btn btn-codhq"
-              onclick="
-                window
-                  .getExternal()
-                  .openUrl(
-                    'https://github.com/LarkTheStar/fix-installer/releases'
-                  )
-              "
+              data-url="https://github.com/LarkTheStar/fix-installer/releases"
             >
               Setup utility
             </button>
@@ -3579,6 +3574,42 @@
           <button type="button" class="btn btn-full" id="codhqWelcomeGo">
             Got it, let me set my name
           </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="popup-backdrop" id="creatorBuilds">
+      <div class="popup creator-builds-popup">
+        <div class="popup-header">
+          <h3>Builds from the original creator</h3>
+          <button type="button" class="popup-close" id="creatorBuildsClose">
+            &times;
+          </button>
+        </div>
+        <div class="popup-content creator-builds">
+          <p>
+            These are releases of the original BOIII client published by its
+            creator (Ezz) on <code>github.com/Ezz-lol/boiii-free</code>. They
+            are <strong>not CodHQ builds</strong>: none of our fixes, none of
+            our branding, and the Discord and Forum buttons in this launcher
+            already point at his community.
+          </p>
+          <p>
+            A creator build keeps its own executable and the client stops
+            updating everything while it is selected, so his binary is never
+            mixed with CodHQ's data files. Switch back to a CodHQ build, or to
+            <strong>Latest (auto-update)</strong>, whenever you want.
+          </p>
+          <div class="creator-builds-list" id="ezzVersionOptions">
+            <div class="creator-builds-status">
+              Loading Ezz's releases&hellip;
+            </div>
+          </div>
+          <div class="creator-builds-actions">
+            <button type="button" class="btn" id="creatorBuildsBack">
+              Back to CodHQ builds
+            </button>
+          </div>
         </div>
       </div>
     </div>
