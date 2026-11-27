@@ -6,6 +6,12 @@
   "date": "2026-11-27"
  },
  {
+  "tag": "3.1.0-codhq.10",
+  "url": "https://github.com/LarkTheStar/codhq-boiii/releases/download/v3.1.0-codhq.10/boiii.exe",
+  "size": 7664640,
+  "date": "2026-11-27"
+ },
+ {
   "tag": "3.1.0-codhq.8",
   "url": "https://github.com/LarkTheStar/codhq-boiii/releases/download/v3.1.0-codhq.8/boiii.exe",
   "size": 7661056,
@@ -45,12 +51,6 @@
   "tag": "3.1.0-codhq.2",
   "url": "https://github.com/LarkTheStar/codhq-boiii/releases/download/v3.1.0-codhq.2/boiii.exe",
   "size": 7653376,
-  "date": "2026-11-27"
- },
- {
-  "tag": "3.1.0-codhq.10",
-  "url": "https://github.com/LarkTheStar/codhq-boiii/releases/download/v3.1.0-codhq.10/boiii.exe",
-  "size": 7664640,
   "date": "2026-11-27"
  },
  {
