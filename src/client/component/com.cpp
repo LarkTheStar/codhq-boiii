@@ -136,7 +136,7 @@ utils::hook::detour Cmd_ExecuteSingleCommand_hook;
 void Cmd_ExecuteSingleCommand_stub(
     const int local_client_num, const game::ControllerIndex_t controller_index,
     const char *text, const bool from_remote_console) {
-  if (refuse_missing_mode_for_level(level_of_command(text))) {
+  if (refuse_missing_mode_for_level(level_of_command(text).c_str())) {
     return;
   }
 
