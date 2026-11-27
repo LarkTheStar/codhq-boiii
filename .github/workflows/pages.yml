@@ -115,6 +115,16 @@ jobs:
           gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > releases.json
           python - <<'PY'
           import json
+          import re
+
+          def version_key(version):
+              # v<client base>-codhq.<n> sorts by the client build, then by our
+              # release number, numerically: 10 comes after 9, not after 1.
+              match = re.fullmatch(r'(\d+)\.(\d+)\.(\d+)-codhq\.(\d+)', version['tag'])
+              if match is None:
+                  return ((0, 0, 0), 0)
+              return (tuple(int(part) for part in match.group(1, 2, 3)), int(match.group(4)))
+
           versions = []
           for release in json.load(open('releases.json', encoding='utf-8')):
               tag = release.get('tag_name', '')
@@ -129,6 +139,10 @@ jobs:
                   'size': asset['size'],
                   'date': (release.get('published_at') or '')[:10],
               })
+          # The API returns release-record creation order, which is not version
+          # order: v3.1.0-codhq.10's record was created before most of the others,
+          # so it used to land near the bottom of the launcher's selector.
+          versions.sort(key=version_key, reverse=True)
           with open('site/versions.json', 'w', encoding='utf-8', newline='\n') as handle:
               json.dump(versions, handle, indent=1)
               handle.write('\n')
