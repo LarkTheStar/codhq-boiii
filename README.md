@@ -1,55 +1,116 @@
 # CodHQ BOIII: Call of Duty® Black Ops III client
 
-Our own build of the community BOIII client, made for the Call of Duty HQ setup utility.
+Our own build of the community BOIII client, made for the Call of Duty HQ setup
+utility.
 
 - Built from this repository by CI on every `v*` tag and published to
-  https://larkthestar.github.io/codhq-boiii/ ; the client updates itself from there.
-- The source is the BOIII project originally by momo5502 and X Labs, continued by
-  AlterWare and by Ezz (`Ezz-lol/boiii-free`). Their credits below still apply; this
-  fork adds our own fixes and packaging, under GPL-3.0 (see `LICENSE`).
+  https://larkthestar.github.io/codhq-boiii/ ; the client updates itself from
+  there.
+- The source is the BOIII project originally by momo5502 and X Labs, continued
+  by AlterWare and by Ezz (`Ezz-lol/boiii-free`). Their credits below still
+  apply; this fork adds our own fixes and packaging, under GPL-3.0 (see
+  `LICENSE`).
 - It loads into the player's own `BlackOps3.exe`. The client build a game must
   match has the PE header checksum `0x6531394`; the unranked dedicated server's
   is `0x14C28B4`.
-- A build the client cannot load is never replaced silently: the client offers the
-  compatible `BlackOps3.exe` (released Sept 10, 2026) and installs it only after
-  the player agrees. The download is checked by SHA-1 and PE checksum, the
-  player's own file is kept as `BlackOps3.exe.boiii_backup`, and declining leaves
-  it untouched. The same installer is on Settings => Patches.
-  See [docs/blackops3-executable.md](docs/blackops3-executable.md).
-- Server browser, lobbies and players use the community master servers, not ours. Only
-  the client's own update files come from our Pages site.
+- A build the client cannot load is never replaced silently: the client offers
+  the compatible `BlackOps3.exe` (released Sept 10, 2026) and installs it only
+  after the player agrees. The download is checked by SHA-1 and PE checksum, the
+  player's own file is kept as `BlackOps3.exe.boiii_backup`, and declining
+  leaves it untouched. The same installer is on Settings => Patches. See
+  [docs/blackops3-executable.md](docs/blackops3-executable.md).
+- Server browser, lobbies and players use the community master servers, not
+  ours. Only the client's own update files come from our Pages site.
 
 ## Maintaining this fork
 
-- Upstream is `Ezz-lol/boiii-free`. Merge its release tags (`git fetch upstream --tags`)
-  and rebuild; never let an old offset table linger after a Black Ops 3 update.
-- After every Black Ops 3 update, recheck the executable checksums above and the Arxan
-  handling in `src/client/`, then publish a new `v*` tag: CI rebuilds the client, the
-  `data/` tree and `boiii.json` and pushes them to the `gh-pages` branch.
-- Keep an eye on the issue trackers of Ezz's client, CBServers' fork and BO3Enhanced for
-  security reports and workarounds worth porting.
-- The installer pins one release of this client by size and SHA-256; a new tag needs that
-  pin updated in `install.ps1` of the setup utility.
+- Upstream is `Ezz-lol/boiii-free`. Merge its release tags
+  (`git fetch upstream --tags`) and rebuild; never let an old offset table
+  linger after a Black Ops 3 update.
+- After every Black Ops 3 update, recheck the executable checksums above and the
+  Arxan handling in `src/client/`, then publish a new `v*` tag: CI rebuilds the
+  client, the `data/` tree and `boiii.json` and pushes them to the `gh-pages`
+  branch.
+- Keep an eye on the issue trackers of Ezz's client, CBServers' fork and
+  BO3Enhanced for security reports and workarounds worth porting.
+- The installer pins one release of this client by size and SHA-256; a new tag
+  needs that pin updated in `install.ps1` of the setup utility.
 
 ## Keeping up with upstream
 
-Ezz's client keeps moving, so `.github/workflows/sync-upstream.yml` runs every night:
+Ezz's client keeps moving, so `.github/workflows/sync-upstream.yml` runs every
+night:
 
-- It fetches `Ezz-lol/boiii-free` and, when it has new commits, merges them into the
-  `sync/upstream` branch and builds `Release_x64` with the release toolchain.
-- A merge that builds becomes a pull request. Nothing lands on `main` by itself: our
-  patches carry game offsets, so a clean merge still has to be read and tested against
-  the game before it is released.
-- A merge that conflicts, or that does not build, becomes an issue with the conflicted
-  files or the end of the build log. The branch stays pushed so the work is not lost.
-- Run it early with `gh workflow run sync-upstream.yml` when upstream announces a change.
+- It fetches `Ezz-lol/boiii-free` and, when it has new commits, merges them into
+  the `sync/upstream` branch and builds `Release_x64` with the release
+  toolchain.
+- A merge that builds becomes a pull request. Nothing lands on `main` by itself:
+  our patches carry game offsets, so a clean merge still has to be read and
+  tested against the game before it is released.
+- A merge that conflicts, or that does not build, becomes an issue with the
+  conflicted files or the end of the build log. The branch stays pushed so the
+  work is not lost.
+- Run it early with `gh workflow run sync-upstream.yml` when upstream announces
+  a change.
 
-After merging a sync, rebuild, recheck the offsets and Arxan handling, and publish a new
-`v*` tag; that tag is what updates installed clients and what the installer pins.
+After merging a sync, rebuild, recheck the offsets and Arxan handling, and
+publish a new `v*` tag; that tag is what updates installed clients and what the
+installer pins.
+
+## Versions
+
+Our tags name the client build we started from and the release on top of it:
+
+- `v3.1.0-codhq.1`, `v3.1.0-codhq.2`, … are our releases on Ezz's `v3.1.0`.
+- A new upstream base starts a new line: merging upstream `v3.2.0` and releasing
+  it gives `v3.2.0-codhq.1`.
+- `premake5.lua` writes the tag into `src/version.h`, so the launcher's sidebar,
+  the console title and Settings => About show exactly the release a player
+  runs. The numeric `FileVersion` stays `3.1.0.<commit count>`, because Windows
+  needs numbers.
+
+Every tag publishes two things: the update site (installed clients read it) and
+a GitHub release carrying `boiii.exe` and `codhq-boiii.zip`. CI then writes
+`versions.json` from those releases, and the launcher's Version selector reads
+it: the list can only ever contain CodHQ builds, newest first.
+
+Picking an older build in that selector downloads it to `versions/` next to the
+game and starts it with `-noupdate`, so it keeps running that executable until
+"Latest (auto-update)" is picked again. The client's own `data/` files still
+update: only the executable is pinned.
+
+### Builds from the original creator
+
+Under the selector, "Builds from the original creator…" lists Ezz's releases
+from `Ezz-lol/boiii-free` and runs one untouched, for anyone who wants to
+compare or go back to his client. Those are not CodHQ builds: none of our fixes,
+none of our branding, and the Discord and Forum buttons in the launcher already
+point at his community. While one is selected the updater skips **everything**
+(executable and `data/`), so his binary is never mixed with our data tree; pick
+a CodHQ build or "Latest (auto-update)" to switch back.
+
+## How updates reach players
+
+`src/client/updater/file_updater.cpp` names this repository's Pages site as the
+only update host. On startup (unless `-noupdate`) the client fetches
+`boiii.json` with a cache-buster, SHA-1-compares all 196 entries (`boiii.exe`
+plus the `data/` tree: launcher UI, `scripts/`, `ui_scripts/`, `lua/`,
+`custom_scripts/`, `lookup_tables/`, `gamesettings/`), downloads only what
+changed, replaces the executable and restarts. Game files and `BlackOps3.exe`
+are never touched.
+
+Upstream changes reach players only through us: the nightly sync opens a pull
+request, a release is tagged when it has been read and tested, CI publishes the
+site, and every installed client picks it up on its next launch.
 
 ---
 
-# Ezz BOIII ☄️: Call of Duty® Black Ops III Client
+# Upstream documentation (Ezz's, unmodified)
+
+Everything below this line is the README of the project this fork is built on
+(`Ezz-lol/boiii-free`), kept as it is: its command line arguments, dedicated
+server and workshop instructions apply to our builds too. Its links point at
+Ezz's sites.
 
 [![github](https://img.shields.io/badge/GitHub-Repository-blue)](https://github.com/Ezz-lol/boiii-free)
 
@@ -449,35 +510,38 @@ Want to build Ezz BOIII yourself? Here's how! 🔨
 
 ### Windows prerequisites this fork needed
 
-`generate.bat` installs premake5 if it is missing, then generates the project files;
-`premake5 ninja` and `ninja Release_x64 -Cbuild` build the same way CI does. Beyond
-Visual Studio's **Desktop development with C++** workload, a full build here needed:
+`generate.bat` installs premake5 if it is missing, then generates the project
+files; `premake5 ninja` and `ninja Release_x64 -Cbuild` build the same way CI
+does. Beyond Visual Studio's **Desktop development with C++** workload, a full
+build here needed:
 
-- **ATL** (`atlbase.h`, `atls.lib`): the *C++ ATL for latest v143 build tools* component.
-  Without it, `com.hpp` stops at `atlbase.h`. It can be added without admin rights with
-  `vs_BuildTools.exe --layout <dir> --add Microsoft.VisualStudio.Component.VC.ATL`, then
-  pointing `INCLUDE`/`LIB` at the extracted `atlmfc` folder.
-- **`llvm-windres`**: `premake/module/llvm.lua` calls it, and the LLVM Windows package
-  does not always ship it next to `clang-cl`. `llvm-rc` does ship, and it is what CI
-  uses; a small wrapper that maps `-i/-o/-D/-I` onto `llvm-rc`'s `/fo /d /I` is enough.
+- **ATL** (`atlbase.h`, `atls.lib`): the _C++ ATL for latest v143 build tools_
+  component. Without it, `com.hpp` stops at `atlbase.h`. It can be added without
+  admin rights with
+  `vs_BuildTools.exe --layout <dir> --add Microsoft.VisualStudio.Component.VC.ATL`,
+  then pointing `INCLUDE`/`LIB` at the extracted `atlmfc` folder.
+- **`llvm-windres`**: `premake/module/llvm.lua` calls it, and the LLVM Windows
+  package does not always ship it next to `clang-cl`. `llvm-rc` does ship, and
+  it is what CI uses; a small wrapper that maps `-i/-o/-D/-I` onto `llvm-rc`'s
+  `/fo /d /I` is enough.
 - **The SDK's `winrt` include**: WebView2 needs `EventToken.h`, which lives in
   `Windows Kits\10\Include\<version>\winrt` and is not in the default `INCLUDE`.
 
 A clean checkout of the submodules is required: a shallow clone leaves
-`deps/rapidjson/thirdparty/gtest` pointing at a commit that is not in the shallow
-history, and generation fails. Build from the command line with standard input
-closed (`ninja Release_x64 -Cbuild < /dev/null`); Ninja otherwise fails with
-`ReadFile: The handle is invalid` when it is started from some shells.
+`deps/rapidjson/thirdparty/gtest` pointing at a commit that is not in the
+shallow history, and generation fails. Build from the command line with standard
+input closed (`ninja Release_x64 -Cbuild < /dev/null`); Ninja otherwise fails
+with `ReadFile: The handle is invalid` when it is started from some shells.
 
-The release build links with `/Brepro`, so the same sources and the same toolchain
-produce the same bytes apart from the linker's timestamp and CodeView GUID.
-`tools/canonicalize-pe.py` clears those two fields in `boiii.exe` (and in the
-`tlsdll.dll` embedded in its resources), and `tools/make-archive.py` writes the
-published ZIP with fixed dates, so a rebuild of a tag gives the same archive and the
-same SHA-256. That is what lets the installer pin one published build: re-running the
-release workflow does not invalidate the pin. Both are plain Python 3 and run in the
-release workflow; run them yourself after a local build if you want to compare it with
-a published one.
+The release build links with `/Brepro`, so the same sources and the same
+toolchain produce the same bytes apart from the linker's timestamp and CodeView
+GUID. `tools/canonicalize-pe.py` clears those two fields in `boiii.exe` (and in
+the `tlsdll.dll` embedded in its resources), and `tools/make-archive.py` writes
+the published ZIP with fixed dates, so a rebuild of a tag gives the same archive
+and the same SHA-256. That is what lets the installer pin one published build:
+re-running the release workflow does not invalidate the pin. Both are plain
+Python 3 and run in the release workflow; run them yourself after a local build
+if you want to compare it with a published one.
 
 ### Prerequisites
 

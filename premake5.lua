@@ -189,6 +189,20 @@ local function vertonumarr(value, vernumber, partscount)
   return vernum
 end
 
+--- The version string a player sees: the tag without its leading "v", so a release
+--- reads "3.1.0-codhq.2" and names both the client build it sits on and the number
+--- of our release. A checkout with no tag (a fresh clone, a commit before the first
+--- release) falls back to the numeric product version.
+local function release_version(tag, vernumber)
+  if type(tag) == "string" then
+    local stripped = tag:gsub("%s+", ""):gsub("^v", "")
+    if stripped ~= "" then
+      return stripped
+    end
+  end
+  return table.concat(vertonumarr(tag, vernumber, 3), ".")
+end
+
 local function system_include(dir)
   return "-isystem=" .. dir
 end
@@ -357,7 +371,10 @@ local function generate_buildinfo(wks)
     versionHeader:write("// Alias definitions\n")
 
     versionHeader:write("#define VERSION GIT_DESCRIBE\n")
-    versionHeader:write("#define SHORTVERSION VERSION_PRODUCT\n")
+    -- SHORTVERSION is what the launcher, the console and Settings => About print, so
+    -- it carries the release tag ("3.1.0-codhq.2") instead of VERSION_PRODUCT, which
+    -- vertonumarr() truncates to the first three numbers of the tag.
+    versionHeader:write("#define SHORTVERSION " .. cstrquote(release_version(tagName, revNumber)) .. "\n")
     versionHeader:flush()
     versionHeader:close()
     local versionHeaderHpp = assert(io.open(wks.location .. "/src/version.hpp", "w"))

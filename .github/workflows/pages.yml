@@ -85,6 +85,57 @@ jobs:
           set -euo pipefail
           python tools/make-archive.py site/boiii site/codhq-boiii.zip
 
+      # A tag is a release: the same executable and archive the site publishes are
+      # attached to a GitHub release, and the launcher's Version selector reads the
+      # releases list (see versions.json below), never Ezz's.
+      - name: Publish this tag as a release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME}"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$tag" site/boiii/boiii.exe site/codhq-boiii.zip \
+              --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$tag" site/boiii/boiii.exe site/codhq-boiii.zip \
+              --repo "$GITHUB_REPOSITORY" --title "CodHQ BOIII $tag" --generate-notes
+          fi
+
+      # The launcher offers exactly the releases that exist and carry boiii.exe, so a
+      # listed version can never be a dead download. Newest first.
+      - name: Write versions.json for the launcher's version list
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          gh api "repos/${GITHUB_REPOSITORY}/releases?per_page=100" > releases.json
+          python - <<'PY'
+          import json
+          versions = []
+          for release in json.load(open('releases.json', encoding='utf-8')):
+              tag = release.get('tag_name', '')
+              if '-codhq.' not in tag or release.get('draft') or release.get('prerelease'):
+                  continue
+              asset = next((item for item in release.get('assets', []) if item.get('name') == 'boiii.exe'), None)
+              if asset is None:
+                  continue
+              versions.append({
+                  'tag': tag[1:] if tag.startswith('v') else tag,
+                  'url': asset['browser_download_url'],
+                  'size': asset['size'],
+                  'date': (release.get('published_at') or '')[:10],
+              })
+          with open('site/versions.json', 'w', encoding='utf-8', newline='\n') as handle:
+              json.dump(versions, handle, indent=1)
+              handle.write('\n')
+          print(f'{len(versions)} version(s): ' + ', '.join(item['tag'] for item in versions))
+          PY
+          test -s site/versions.json
+
       - name: Write the site landing page
         shell: bash
         run: |
@@ -110,6 +161,7 @@ jobs:
           <li><a href="codhq-boiii.zip">codhq-boiii.zip</a>: the client executable and its whole data tree.</li>
           <li><a href="boiii.json">boiii.json</a>: the published file list with size and SHA-1 of every entry.</li>
           <li><a href="boiii/boiii.exe">boiii/boiii.exe</a>: the client executable on its own.</li>
+          <li><a href="versions.json">versions.json</a>: the releases the launcher's version selector offers.</li>
           </ul>
           <h2>Installing</h2>
           <p>Install it from the CodHQ setup utility, which pins this release by the
