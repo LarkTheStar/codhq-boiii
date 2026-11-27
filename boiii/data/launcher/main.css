@@ -3599,3 +3599,84 @@ body.reduced-motion *, body.reduced-motion *::before, body.reduced-motion *::aft
 #workshopPage .workshop-browse-empty {
   grid-column: 1 / -1;
 }
+
+/* ===== CodHQ: our own branding, links and first-run note ===== */
+.codhq-channel {
+  display: inline-block;
+  padding: 7px 12px;
+  color: rgba(249, 115, 22, 0.92);
+  background: rgba(249, 115, 22, 0.1);
+  border: 1px solid rgba(249, 115, 22, 0.32);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.codhq-links {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.codhq-links .btn {
+  flex: 1;
+  padding: 9px 6px;
+  font-size: 0.64rem;
+  letter-spacing: 0.04em;
+}
+
+.btn-codhq {
+  color: rgba(244, 240, 235, 0.9);
+  background: rgba(249, 115, 22, 0.08);
+  border: 1px solid rgba(249, 115, 22, 0.28);
+}
+
+.btn-codhq:hover {
+  background: rgba(249, 115, 22, 0.16);
+  border-color: rgba(249, 115, 22, 0.55);
+}
+
+.codhq-note {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 0.62rem;
+  line-height: 1.5;
+  color: rgba(231, 226, 221, 0.5);
+}
+
+.credits-text {
+  margin: 0 0 14px;
+  padding: 0 8px;
+  text-align: center;
+  font-size: 0.72rem;
+  line-height: 1.6;
+  color: rgba(244, 240, 235, 0.66);
+}
+
+.codhq-welcome-popup {
+  width: 540px;
+}
+
+.codhq-welcome {
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: rgba(244, 240, 235, 0.82);
+}
+
+.codhq-welcome p { margin: 0 0 10px; }
+.codhq-welcome ul { margin: 0 0 14px; padding-left: 18px; }
+.codhq-welcome li { margin-bottom: 7px; }
+.codhq-welcome code { color: rgba(249, 115, 22, 0.9); }
+
+.codhq-welcome-links {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.codhq-welcome-links .btn {
+  flex: 1;
+  padding: 9px 6px;
+  font-size: 0.66rem;
+}
