@@ -1653,7 +1653,7 @@ struct component final : generic_component {
   DEFINE_COMPONENT_NAME("console");
 
   component() {
-    SetConsoleTitleA("EZZ BOIII V" SHORTVERSION);
+    SetConsoleTitleA("CodHQ BOIII V" SHORTVERSION);
 
     if (game::is_headless()) {
       if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
@@ -1661,7 +1661,7 @@ struct component final : generic_component {
         AttachConsole(GetCurrentProcessId());
       }
 
-      SetConsoleTitleA("EZZ BOIII V" SHORTVERSION);
+      SetConsoleTitleA("CodHQ BOIII V" SHORTVERSION);
       ShowWindow(GetConsoleWindow(),
                  hide_external_console() ? SW_HIDE : SW_SHOW);
 

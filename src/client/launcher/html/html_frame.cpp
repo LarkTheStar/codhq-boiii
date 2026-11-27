@@ -53,8 +53,21 @@ std::wstring get_webview_data_path() {
     return {};
   }
 
-  auto path = std::filesystem::path(local_app_data) / "EZZ BOIII" / "WebView2";
+  const std::filesystem::path profile =
+      std::filesystem::path(local_app_data) / "CodHQ BOIII";
+  const std::filesystem::path legacy =
+      std::filesystem::path(local_app_data) / "EZZ BOIII";
+  const auto path = profile / "WebView2";
+
   std::error_code error;
+  // Earlier builds kept the WebView2 profile under the old name. Carry it over
+  // once so an existing install keeps the launcher's local storage instead of
+  // starting again from an empty profile.
+  if (!std::filesystem::exists(path, error) &&
+      std::filesystem::exists(legacy, error)) {
+    std::filesystem::rename(legacy, profile, error);
+  }
+  error.clear();
   std::filesystem::create_directories(path, error);
   return error ? std::wstring{} : path.wstring();
 }
@@ -302,7 +315,7 @@ void html_frame::show_webview_error(const HRESULT result) const {
       L"The Microsoft Edge WebView2 launcher could not start.\n\nError: "
       L"0x{:08X}",
       static_cast<unsigned long>(result));
-  MessageBoxW(this->window_, message.c_str(), L"EZZ BOIII",
+  MessageBoxW(this->window_, message.c_str(), L"CodHQ BOIII",
               MB_OK | MB_ICONERROR);
   PostMessageW(this->window_, WM_CLOSE, 0, 0);
 }
@@ -442,13 +455,13 @@ void html_frame::initialize_legacy_browser() {
     MessageBoxW(this->window_,
                 L"The Wine launcher browser could not start. Install the "
                 L"Wine Gecko package for this Wine prefix and try again.",
-                L"EZZ BOIII", MB_OK | MB_ICONERROR);
+                L"CodHQ BOIII", MB_OK | MB_ICONERROR);
     PostMessageW(this->window_, WM_CLOSE, 0, 0);
     return;
   }
 
   this->browser_object_->SetClientSite(this);
-  this->browser_object_->SetHostNames(L"EZZ BOIII", nullptr);
+  this->browser_object_->SetHostNames(L"CodHQ BOIII", nullptr);
   RECT bounds{};
   GetClientRect(this->window_, &bounds);
   OleSetContainedObject(this->browser_object_, TRUE);
@@ -458,7 +471,7 @@ void html_frame::initialize_legacy_browser() {
     MessageBoxW(this->window_,
                 L"Wine Gecko was found but the launcher browser could not "
                 L"be displayed.",
-                L"EZZ BOIII", MB_OK | MB_ICONERROR);
+                L"CodHQ BOIII", MB_OK | MB_ICONERROR);
     PostMessageW(this->window_, WM_CLOSE, 0, 0);
     return;
   }
