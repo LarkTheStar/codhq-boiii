@@ -4733,15 +4733,44 @@
     xhr.send();
   }
 
-  // Beta build - added first and prepended so it stays pinned at the top
-  // of the list regardless of when the releases fetch below resolves.
-  _versionsData["beta"] = {
-    url: "https://r2.ezz.lol/boiii/beta/boiii.exe",
-    name: "versions/boiii-beta.exe",
-  };
-  addVersionOption("beta", "Beta (Experimental)", true);
+  // CodHQ: the version selector and EZZ's release list are gone on purpose. This
+  // build is published and updated by us, so Play always runs the CodHQ client and
+  // the launcher never asks EZZ's GitHub or r2.ezz.lol for a build.
+  _selectedVersion = "latest";
 
-  fetchReleases();
+  /* CodHQ: the first-run note. Shown once per WebView profile, then remembered. */
+  (function codhqWelcome() {
+    var popup = document.getElementById("codhqWelcome");
+    if (!popup) return;
+    var key = "codhq_welcome_v1";
+    var seen = null;
+    try {
+      seen = localStorage.getItem(key);
+    } catch (e) {}
+    if (seen) return;
+
+    function hide() {
+      popup.classList.remove("active");
+      try {
+        localStorage.setItem(key, "1");
+      } catch (e) {}
+      var name = document.getElementById("playerName");
+      if (name) {
+        try {
+          name.focus();
+        } catch (e) {}
+      }
+    }
+
+    var close = document.getElementById("codhqWelcomeClose");
+    if (close) close.onclick = hide;
+    var go = document.getElementById("codhqWelcomeGo");
+    if (go) go.onclick = hide;
+    popup.onclick = function (e) {
+      if (e.target === popup) hide();
+    };
+    popup.classList.add("active");
+  })();
 
   var creditsPopup = document.getElementById("creditsPopup");
   var versionDisplay = document.getElementById("versionDisplay");

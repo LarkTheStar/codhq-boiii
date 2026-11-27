@@ -1165,7 +1165,7 @@ bool relaunch_exe_with_launch_options(const std::string &exe_path,
   ZeroMemory(&startup_info, sizeof(startup_info));
   ZeroMemory(&process_info, sizeof(process_info));
   startup_info.cb = sizeof(startup_info);
-  char console_title[] = "EZZ BOIII V" SHORTVERSION;
+  char console_title[] = "CodHQ BOIII V" SHORTVERSION;
   startup_info.lpTitle = console_title;
 
   char current_dir[MAX_PATH];
@@ -1248,7 +1248,7 @@ bool relaunch_with_launch_options(const std::vector<std::string> &options) {
   ZeroMemory(&startup_info, sizeof(startup_info));
   ZeroMemory(&process_info, sizeof(process_info));
   startup_info.cb = sizeof(startup_info);
-  char console_title[] = "EZZ BOIII V" SHORTVERSION;
+  char console_title[] = "CodHQ BOIII V" SHORTVERSION;
   startup_info.lpTitle = console_title;
 
   char current_dir[MAX_PATH];
@@ -1519,7 +1519,7 @@ bool run() {
       std::make_shared<std::string>();
 
   {
-    html_window window("EZZ BOIII", 1260, 680);
+    html_window window("CodHQ BOIII", 1260, 680);
 
     window.get_html_frame()->register_callback(
         "getVersion",
