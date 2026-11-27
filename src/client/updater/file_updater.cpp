@@ -50,6 +50,11 @@ bool should_skip_host_update() {
          !(utils::flags::has_flag("beta") && is_dedicated_server());
 }
 
+bool is_creator_build() {
+  // The launcher stores a build from the original client as "ezz:<tag>".
+  return get_selected_version().rfind("ezz:", 0) == 0;
+}
+
 std::string get_update_file() {
   if (get_selected_version() == "beta") {
     return UPDATE_FILE_BETA;
@@ -202,6 +207,16 @@ void file_updater::create_config_file_if_not_exists() const {
 }
 
 void file_updater::run() const {
+  // A creator build is the original client's own executable: updating our data
+  // tree underneath it is exactly the version mixing that breaks clients, so a
+  // creator build freezes updates until a CodHQ build (or Latest) is selected.
+  if (is_creator_build()) {
+    OutputDebugStringA("An original creator build is selected; the CodHQ "
+                       "update check is skipped until a CodHQ build is "
+                       "selected.\n");
+    return;
+  }
+
   this->create_config_file_if_not_exists();
 
   const std::vector<file_info> files = get_file_infos();
