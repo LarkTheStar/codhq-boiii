@@ -28,18 +28,19 @@ void set_server_info_in_console_title() {
   const char *clean_server_name = game::I_CleanStr(server_name.data());
 
   if (!sv_running) {
-    console::set_title(utils::string::va("%s - BOIII V%s - not running",
+    console::set_title(utils::string::va("%s - CodHQ BOIII V%s - not running",
                                          clean_server_name, SHORTVERSION));
     return;
   }
 
   const std::string_view mapname = game::get_mapname().value_or("");
 
-  const std::string window_text = utils::string::va(
-      "%s - BOIII V%s on %s [%d/%d] (%d)", clean_server_name, SHORTVERSION,
-      mapname.data(), static_cast<int>(game::connected_client_count()),
-      static_cast<int>(game::get_max_client_count()),
-      static_cast<int>(game::test_client_count()));
+  const std::string window_text =
+      utils::string::va("%s - CodHQ BOIII V%s on %s [%d/%d] (%d)",
+                        clean_server_name, SHORTVERSION, mapname.data(),
+                        static_cast<int>(game::connected_client_count()),
+                        static_cast<int>(game::get_max_client_count()),
+                        static_cast<int>(game::test_client_count()));
 
   console::set_title(window_text);
 }

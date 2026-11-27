@@ -1398,8 +1398,8 @@ void sys_create_console_stub(const HINSTANCE h_instance) {
 
   const char *class_name = "BOIII WinConsole";
   const char *window_name = game::is_server()
-                                ? "BOIII V" SHORTVERSION " - Server"
-                                : "BOIII V" SHORTVERSION " - Console";
+                                ? "CodHQ BOIII V" SHORTVERSION " - Server"
+                                : "CodHQ BOIII V" SHORTVERSION " - Console";
 
   WNDCLASSA wnd_class{};
   wnd_class.style = 0;
