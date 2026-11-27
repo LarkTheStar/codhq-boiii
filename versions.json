@@ -1,5 +1,11 @@
 [
  {
+  "tag": "3.1.0-codhq.4",
+  "url": "https://github.com/LarkTheStar/codhq-boiii/releases/download/v3.1.0-codhq.4/boiii.exe",
+  "size": 7653888,
+  "date": "2026-11-27"
+ },
+ {
   "tag": "3.1.0-codhq.3",
   "url": "https://github.com/LarkTheStar/codhq-boiii/releases/download/v3.1.0-codhq.3/boiii.exe",
   "size": 7653888,
