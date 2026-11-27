@@ -4,6 +4,7 @@
 #include "getinfo.hpp"
 #include "scheduler.hpp"
 #include "script.hpp"
+#include "toast.hpp"
 
 #include <loader/component_loader.hpp>
 
@@ -625,6 +626,20 @@ void Com_Error_LuiOutOfMemory(const char *file, const int32_t line,
 
 std::string explain_missing_mode_for_level(const char *level) {
   return missing_mode_for_level(level);
+}
+
+bool refuse_missing_mode_for_level(const char *level, const char *tag) {
+  const std::string help = missing_mode_for_level(level);
+  if (help.empty()) {
+    return false;
+  }
+
+  printf("[%s] %s\n", tag != nullptr ? tag : "Com", strip_colors(help).c_str());
+  toast::warn("The game cannot load this map",
+              "The Multiplayer or Zombies pack is missing from your install. "
+              "In Steam: right-click Black Ops III > Properties > DLC, tick "
+              "the pack and let it download.");
+  return true;
 }
 
 bool mode_data_installed(const char *mode) {

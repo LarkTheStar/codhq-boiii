@@ -11,6 +11,11 @@ std::string explain_missing_mode_for_level(const char *level);
 // Whether a game mode's shared data ('mp', 'zm', 'cp') is installed at all.
 bool mode_data_installed(const char *mode);
 
+// Explains a missing game-mode pack for this level on the console and in a
+// toast. Returns true when the level needs a pack that is not installed, so the
+// caller must not start the level or the connection.
+bool refuse_missing_mode_for_level(const char *level, const char *tag);
+
 void Com_Error_LuiOutOfMemory(const char *file, int32_t line,
                               game::errorParm code, const char *fmt);
 void Sys_Error_LuiOutOfMemory(const char *fmt);

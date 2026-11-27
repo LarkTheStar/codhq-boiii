@@ -7,7 +7,6 @@
 #include "command.hpp"
 #include "error_help.hpp"
 #include "scheduler.hpp"
-#include "toast.hpp"
 
 #include <utils/concurrency.hpp>
 #include <utils/hook.hpp>
@@ -86,70 +85,21 @@ void DB_LoadXAssets_stub(game::db::xzone::XZoneInfo *zoneInfo,
   }
 }
 
-// The level name a 'map', 'devmap' or 'setmap' command asks for, or an empty
-// string when the text is not a level change.
-std::string level_of_command(const char *text) {
-  if (text == nullptr) {
-    return {};
-  }
-
-  std::string command = utils::string::to_lower(text);
-  size_t start = command.find_first_not_of(" ;\t");
-  if (start == std::string::npos) {
-    return {};
-  }
-  const size_t name_end = command.find_first_of(" \t", start);
-  const std::string name = command.substr(start, name_end - start);
-  if (name != "map" && name != "devmap" && name != "setmap") {
-    return {};
-  }
-  if (name_end == std::string::npos) {
-    return {};
-  }
-  start = command.find_first_not_of(" \t", name_end);
-  if (start == std::string::npos) {
-    return {};
-  }
-  const size_t level_end = command.find_first_of(" ;\t", start);
-  return command.substr(start, level_end - start);
-}
+using command_function = void(__fastcall *)();
+command_function engine_map_command = nullptr;
+command_function engine_devmap_command = nullptr;
 
 // Refuse to start a level whose game-mode pack is not installed. Without it the
 // engine either walks into a null asset while loading the fast files or faults
 // in the lobby code before it gets that far; both end the match attempt in a
 // crash instead of an explanation.
-bool refuse_missing_mode_for_level(const char *level) {
-  const std::string help = error_help::explain_missing_mode_for_level(level);
-  if (help.empty()) {
-    return false;
-  }
-
-  printf("[Com] %s\n", error_help::strip_colors(help).c_str());
-  toast::warn("The game cannot load this level",
-              "The Multiplayer or Zombies pack is missing from your install. "
-              "In Steam: right-click Black Ops III > Properties > DLC, tick "
-              "the pack and let it download.");
-  return true;
-}
-
-utils::hook::detour Cmd_ExecuteSingleCommand_hook;
-void Cmd_ExecuteSingleCommand_stub(
-    const int local_client_num, const game::ControllerIndex_t controller_index,
-    const char *text, const bool from_remote_console) {
-  if (refuse_missing_mode_for_level(level_of_command(text).c_str())) {
-    return;
-  }
-
-  Cmd_ExecuteSingleCommand_hook.invoke(local_client_num, controller_index, text,
-                                       from_remote_console);
-}
-
-using command_function = void(__fastcall *)();
-command_function engine_map_command = nullptr;
-command_function engine_devmap_command = nullptr;
-
+// The registered 'map'/'devmap' commands are what a typed level change actually
+// runs on this engine build (its command executor does not go through the
+// detour that was tried first), so these function pointers are the single place
+// the check has to sit.
 void run_level_command(const command_function original) {
-  if (refuse_missing_mode_for_level(command::params{}.get(1))) {
+  if (error_help::refuse_missing_mode_for_level(command::params{}.get(1),
+                                                "Com")) {
     return;
   }
   if (original != nullptr) {
@@ -221,10 +171,6 @@ public:
                                DB_LoadXAssets_stub);
     Com_LoadLevelFastFiles_hook.create(game::com::Com_LoadLevelFastFiles.get(),
                                        Com_LoadLevelFastFiles_stub);
-
-    Cmd_ExecuteSingleCommand_hook.create(
-        game::cmd::Cmd_ExecuteSingleCommand.get(),
-        Cmd_ExecuteSingleCommand_stub);
 
     scheduler::once([] { guard_level_commands(); }, scheduler::pipeline::main,
                     std::chrono::milliseconds(5000));

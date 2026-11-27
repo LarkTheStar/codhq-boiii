@@ -5,6 +5,7 @@
 
 #include "auth.hpp"
 #include "command.hpp"
+#include "error_help.hpp"
 #include "friends.hpp"
 #include "game/impl/ugc/ugc.hpp"
 #include "nat.hpp"
@@ -604,6 +605,13 @@ void handle_connect_query_response(const bool success,
     const char *msg = "Invalid gametype.";
     printf("Connect failed: %s\n", msg);
     toast::show("Connect failed", msg, "t7_icon_connect_overlays");
+    return;
+  }
+
+  // Without the level's game-mode pack the engine cannot load it. Say so before
+  // the workshop checks report the server's map files as missing, which would
+  // send the player looking for a Workshop download they do not need.
+  if (error_help::refuse_missing_mode_for_level(mapname.c_str(), "Party")) {
     return;
   }
 
