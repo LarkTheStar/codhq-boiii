@@ -22,20 +22,34 @@
 namespace branding {
 namespace {
 void draw_branding() {
-  if (!game::com::Com_IsInGame()) {
-    constexpr float X = 4.0;
-    constexpr float Y = 0.0;
-    constexpr float SCALE = 0.45f;
-    game::vec4_t color = {.r = 0.666f, .g = 0.666f, .b = 0.666f, .a = 0.666f};
-
-    static const uint32_t *font = reinterpret_cast<const uint32_t *>(
-        game::select(0x1432D2918, 0x1410E1BE0));
-
-    game::render::R_AddCmdDrawText(
-        "CodHQ BOIII " VERSION, std::numeric_limits<int>::max(), font, X,
-        Y + static_cast<float>(font[2]) * SCALE, SCALE, SCALE, 0.0f, &color,
-        game::itemTextStyle::NORMAL);
+  if (game::com::Com_IsInGame()) {
+    return;
   }
+
+  constexpr float X = 4.0f;
+  constexpr float Y = 0.0f;
+  constexpr float NAME_SCALE = 0.45f;
+  constexpr float TAG_SCALE = 0.3f;
+
+  static const uint32_t *font = reinterpret_cast<const uint32_t *>(
+      game::select(0x1432D2918, 0x1410E1BE0));
+
+  const float font_height = static_cast<float>(font[2]);
+  const float name_baseline = Y + font_height * NAME_SCALE;
+
+  // The launcher's accent colour, so the in-game mark and the launcher read as
+  // the same client. The tag underneath says which build is running.
+  game::vec4_t name_color = {.r = 0.976f, .g = 0.451f, .b = 0.086f, .a = 1.0f};
+  game::vec4_t tag_color = {.r = 0.666f, .g = 0.666f, .b = 0.666f, .a = 0.9f};
+
+  game::render::R_AddCmdDrawText(
+      "CodHQ BOIII", std::numeric_limits<int>::max(), font, X, name_baseline,
+      NAME_SCALE, NAME_SCALE, 0.0f, &name_color, game::itemTextStyle::NORMAL);
+
+  game::render::R_AddCmdDrawText(
+      "v" SHORTVERSION, std::numeric_limits<int>::max(), font, X,
+      name_baseline + font_height * TAG_SCALE * 1.4f, TAG_SCALE, TAG_SCALE,
+      0.0f, &tag_color, game::itemTextStyle::NORMAL);
 }
 
 const char *get_ingame_console_prefix_stub() { return "CodHQ> "; }

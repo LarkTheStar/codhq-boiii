@@ -170,7 +170,7 @@ int32_t parse_flags(int argc, char *argv[]) {
       .default_value(false)
       .implicit_value(true);
   program.add_argument("-nobranding", "--nobranding")
-      .help("Disable EZZ watermark and console prefix")
+      .help("Disable the CodHQ watermark and console prefix")
       .default_value(false)
       .implicit_value(true);
   program.add_argument("-noratelimit", "--noratelimit")
