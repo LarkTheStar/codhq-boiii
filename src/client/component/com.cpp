@@ -4,6 +4,8 @@
 
 #include "com.hpp"
 
+#include "error_help.hpp"
+
 #include <utils/concurrency.hpp>
 #include <utils/hook.hpp>
 
@@ -15,6 +17,18 @@ utils::concurrency::container<LoadTasks> com_unloadlevelfastfiles_tasks;
 
 utils::hook::detour Com_LoadLevelFastFiles_hook;
 void Com_LoadLevelFastFiles_stub(const char *level) {
+  // Without the mode's common zone the engine walks into a null asset and
+  // dies with an access violation instead of saying what is missing, so stop
+  // with the explanation here.
+  if (const std::string help =
+          error_help::explain_missing_mode_for_level(level);
+      !help.empty()) {
+    printf("[Com] %s\n", error_help::strip_colors(help).c_str());
+    game::com::Com_Error_(__FILE__, __LINE__, game::errorParm::DROP, "\x15%s",
+                          help.c_str());
+    return;
+  }
+
   Com_LoadLevelFastFiles_hook.invoke(level);
   if (level != nullptr && level[0] != NULL) {
     com_loadlevelfastfiles_tasks.access([level](LoadTasks &tasks) {

@@ -18,7 +18,7 @@ std::string get_temp_filename() {
   char pathname[MAX_PATH] = {0};
 
   GetTempPathA(sizeof(pathname), pathname);
-  GetTempFileNameA(pathname, "ezz-", 0, filename);
+  GetTempFileNameA(pathname, "codhq-", 0, filename);
   return filename;
 }
 

@@ -120,16 +120,8 @@ void PrintWaitedError_stub(const XAssetType type, const char *name,
   PrintWaitedError_hook.invoke(type, name, waitedMsec);
 }
 
-// Issue #410: with the Zombies menu open and no zm_ zone files, the game
-// dead-ends when a map is picked. Say what is missing and how to get it back
-// instead.
-void warn_if_zombies_data_missing() {
+bool has_mode_zone(const std::filesystem::path &zone, const char *prefix) {
   std::error_code ec;
-  const std::filesystem::path zone = game::get_game_path() / "zone";
-  if (!std::filesystem::is_directory(zone, ec)) {
-    return;
-  }
-  bool found = false;
   for (const std::filesystem::directory_entry &entry :
        std::filesystem::directory_iterator(zone, ec)) {
     if (!entry.is_regular_file(ec)) {
@@ -139,18 +131,43 @@ void warn_if_zombies_data_missing() {
     std::ranges::transform(name, name.begin(), [](unsigned char c) {
       return static_cast<char>(std::tolower(c));
     });
-    if (name.starts_with("zm_") &&
+    if (name.starts_with(prefix) &&
         (name.ends_with(".ff") || name.ends_with(".xpak"))) {
-      found = true;
-      break;
+      return true;
     }
   }
-  if (!found) {
+  return false;
+}
+
+// Issue #410: with the Zombies menu open and no zm_ zone files, the game
+// dead-ends when a map is picked. Joining a Multiplayer server without the
+// mode's common zone does the same, and the engine reports it as a null asset
+// read. Say what is missing and how to get it back instead of letting either
+// fail on its own.
+void warn_if_mode_data_missing() {
+  std::error_code ec;
+  const std::filesystem::path zone = game::get_game_path() / "zone";
+  if (!std::filesystem::is_directory(zone, ec)) {
+    return;
+  }
+  const std::string where = zone.string();
+  if (!has_mode_zone(zone, "mp_")) {
+    printf("^1[ Multiplayer ]^7 No Multiplayer data was found in %s: there is "
+           "no mp_*.ff or mp_*.xpak in it (zone/mp_common.ff is missing), so "
+           "joining a server cannot work. In Steam: right-click Black Ops III "
+           "> Properties > DLC, tick 'Multiplayer' and let it download, then "
+           "start again. If it is already ticked, use Properties > Installed "
+           "Files > Verify integrity of game files.\n",
+           where.c_str());
+  }
+  if (!has_mode_zone(zone, "zm_")) {
     printf("^1[ Zombies ]^7 No Zombies map data was found in %s: there is no "
            "zm_*.ff or zm_*.xpak in it, so the Zombies entry cannot start a "
-           "game. In Steam: right-click Black Ops III > Properties > Installed "
-           "Files > Verify integrity of game files, then start again.\n",
-           zone.string().c_str());
+           "game. In Steam: right-click Black Ops III > Properties > DLC, "
+           "tick 'Zombies' and let it download, then start again. If it is "
+           "already ticked, use Properties > Installed Files > Verify "
+           "integrity of game files.\n",
+           where.c_str());
   }
 }
 void preload_mode_files() {
@@ -199,7 +216,7 @@ public:
         "Print every asset that couldn't be found");
 
     if (game::is_client()) {
-      warn_if_zombies_data_missing();
+      warn_if_mode_data_missing();
       command::add("DB_FreeUnusedResources", [](const command::params &params) {
         if (!workshop::are_xzones_loading()) {
           game::db::load::DB_FreeUnusedResources(std::atoi(params.get(1)) != 0,

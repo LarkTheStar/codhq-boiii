@@ -41,6 +41,15 @@ namespace exception {
 static std::atomic_size_t known_blocking_call = 0;
 
 namespace {
+// A modal dialog holds the frame loop on purpose, so the freeze watchdog must
+// not report it as a frozen game.
+struct dialog_blocking_scope {
+  dialog_blocking_scope() { known_blocking_call.fetch_add(1); }
+  ~dialog_blocking_scope() { known_blocking_call.fetch_sub(1); }
+};
+} // namespace
+
+namespace {
 void exception_log(bool err, const char *fmt, ...) {
   va_list args;
   va_start(args, fmt);
@@ -387,6 +396,9 @@ std::string crash_reason() {
 
 bool ask_restart(const std::string &text,
                  const wchar_t *headline = L"The game crashed.") {
+  // Our own dialog stops the frame loop on purpose; do not let the freeze
+  // watchdog report that as a frozen game.
+  const dialog_blocking_scope blocking;
   constexpr int32_t RESTART_BUTTON = 100;
   constexpr int32_t CLOSE_BUTTON = 101;
   const TASKDIALOG_BUTTON buttons[] = {
@@ -405,7 +417,7 @@ bool ask_restart(const std::string &text,
   TASKDIALOGCONFIG config{};
   config.cbSize = sizeof(config);
   config.dwFlags = TDF_USE_COMMAND_LINKS | TDF_SIZE_TO_CONTENT;
-  config.pszWindowTitle = L"Ezz ERROR";
+  config.pszWindowTitle = L"CodHQ BOIII";
   config.pszMainIcon = TD_ERROR_ICON;
   config.pszMainInstruction = headline;
   config.pszContent = content.c_str();
@@ -421,18 +433,19 @@ bool ask_restart(const std::string &text,
 void display_error_dialog() {
   const std::string minidumps_out =
       (game::get_appdata_path() / "minidumps").string();
-  const std::string error_str = std::format(
-      "{}\n\nDetails: {} (0x{:08X}) at {:p} on the {} thread.\n\n"
-      "Crash dump saved in:\n{}\nPlease report it on https://dc.ezz.lol",
-      crash_reason(), get_exception_string(exception_data.code),
-      exception_data.code, game::derelocate(exception_data.address),
-      thread_role(), minidumps_out);
+  const std::string error_str =
+      std::format("{}\n\nDetails: {} (0x{:08X}) at {:p} on the {} thread.\n\n"
+                  "Crash dump saved in:\n{}\nPlease report it at "
+                  "https://github.com/LarkTheStar/codhq-boiii/issues",
+                  crash_reason(), get_exception_string(exception_data.code),
+                  exception_data.code, game::derelocate(exception_data.address),
+                  thread_role(), minidumps_out);
 
   utils::thread::suspend_other_threads();
   show_mouse_cursor();
 
   if (game::quiet_crash() || game::is_headless()) {
-    game::show_error(error_str, "Ezz ERROR");
+    game::show_error(error_str, "CodHQ BOIII");
     utils::thread::terminate_other_threads(exception_data.code);
   } else if (ask_restart(error_str)) {
     restart_game();
@@ -591,7 +604,7 @@ std::string generate_crash_info(const LPEXCEPTION_POINTERS exceptioninfo) {
   const resolved_frame crash_frame =
       resolve_address(exceptioninfo->ExceptionRecord->ExceptionAddress);
 
-  line("Ezz Crash Dump");
+  line("CodHQ BOIII crash dump");
   line(std::string{});
   line("Version: "s + VERSION);
   line("Timestamp: "s + get_timestamp());
@@ -675,13 +688,13 @@ std::string generate_crash_info(const LPEXCEPTION_POINTERS exceptioninfo) {
 void write_minidump(const LPEXCEPTION_POINTERS exceptioninfo) {
   const std::string crash_name =
       (game::get_appdata_path() / "minidumps" /
-       utils::string::va("ezz-crash-%s.zip", get_timestamp().data()))
+       utils::string::va("codhq-crash-%s.zip", get_timestamp().data()))
           .string();
 
   utils::compression::zip::archive zip_file{};
   zip_file.add("crash.dmp", create_minidump(exceptioninfo));
   zip_file.add("info.txt", generate_crash_info(exceptioninfo));
-  if (!zip_file.write(crash_name, "Ezz Crash Dump")) {
+  if (!zip_file.write(crash_name, "CodHQ BOIII crash dump")) {
     utils::io::remove_file(crash_name);
   }
 }
@@ -701,9 +714,10 @@ std::string find_culprit(const std::vector<resolved_frame> &frames) {
   if (crashed.get_ptr() == utils::nt::library::get_by_address(
                                reinterpret_cast<const void *>(&find_culprit))
                                .get_ptr()) {
-    return "This is a bug in the Ezz client, not a problem with your PC or "
-           "game files.\nFix: Please report it on https://dc.ezz.lol with the "
-           "crash dump.";
+    return "This is a bug in the CodHQ BOIII client, not a problem with your "
+           "PC or game files.\nFix: Please report it at "
+           "https://github.com/LarkTheStar/codhq-boiii/issues with the crash "
+           "dump.";
   }
 
   std::vector<const void *> addresses{exception_data.address};
@@ -905,7 +919,7 @@ void show_fatal_error(const std::string &message) {
     show_mouse_cursor();
     if (ask_restart(error_help::strip_colors(message) +
                         "\n\nIf this keeps happening, please report it on "
-                        "https://dc.ezz.lol",
+                        "https://github.com/LarkTheStar/codhq-boiii/issues",
                     L"The game hit an error and has to close.")) {
       restart_game();
     }

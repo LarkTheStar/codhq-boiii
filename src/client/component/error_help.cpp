@@ -38,7 +38,85 @@ const std::unordered_set<std::string> PROXY_DLLS{
     "dxgi.dll",    "d3d11.dll", "d3d9.dll",      "dinput8.dll",
     "version.dll", "winmm.dll", "xinput1_3.dll", "dsound.dll"};
 
-std::string explain_zone(const std::string &zone) {
+const std::unordered_map<std::string, std::string> MODE_PACKS{
+    {"mp", "Multiplayer"}, {"zm", "Zombies"}, {"cp", "Campaign"}};
+
+// 'zone/mp_common.ff', 'ZONE/MP_COMMON', 'mp_common' -> 'mp_common'.
+std::string zone_stem(const std::string &zone) {
+  std::string name = utils::string::to_lower(zone);
+  const size_t slash = name.find_last_of("/\\");
+  if (slash != std::string::npos) {
+    name.erase(0, slash + 1);
+  }
+  if (name.ends_with(".ff")) {
+    name.resize(name.size() - 3);
+  } else if (name.ends_with(".xpak")) {
+    name.resize(name.size() - 5);
+  }
+  const size_t separator = name.find('_');
+  if (separator != std::string::npos &&
+      LANGUAGE_PREFIXES.contains(name.substr(0, separator))) {
+    name.erase(0, separator + 1);
+  }
+  return name;
+}
+
+bool zone_file_present(const std::string &name) {
+  const std::filesystem::path zone = game::get_game_path() / "zone";
+  std::error_code error;
+  const auto present = [&](const std::string &stem) {
+    return std::filesystem::exists(zone / (stem + ".ff"), error) ||
+           std::filesystem::exists(zone / (stem + ".xpak"), error);
+  };
+  if (present(name)) {
+    return true;
+  }
+  // Non-English installs keep their own copy under a language prefix.
+  for (const std::string &language : LANGUAGE_PREFIXES) {
+    if (present(language + "_" + name)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// The game-mode pack a shared zone comes from ('mp_common' -> Multiplayer),
+// or an empty string when the zone is not a mode-common file.
+std::string_view mode_pack_of(const std::string &zone) {
+  const size_t separator = zone.find('_');
+  if (separator == std::string::npos) {
+    return {};
+  }
+  const auto mode = MODE_PACKS.find(zone.substr(0, separator));
+  if (mode == MODE_PACKS.end()) {
+    return {};
+  }
+  const std::string_view rest(zone.data() + separator + 1,
+                              zone.size() - separator - 1);
+  const bool shared = rest == "common" || rest == "patch" ||
+                      rest == "levelcommon" || rest.starts_with("common") ||
+                      rest.starts_with("patch");
+  return shared ? std::string_view(mode->second) : std::string_view{};
+}
+
+std::string explain_missing_mode_data(const std::string &zone,
+                                      const std::string_view mode) {
+  return std::format(
+      "^1Black Ops III's {} data is not installed here, so '{}' cannot be "
+      "loaded: there is no zone/{}.ff or zone/{}.xpak in the game "
+      "folder.\n^3Fix: ^7In Steam, right-click Black Ops III > Properties > "
+      "DLC and tick '{}' so it downloads, then start again. If it is already "
+      "ticked, use Properties > Installed Files > Verify integrity of game "
+      "files.",
+      mode, zone, zone, zone, mode);
+}
+
+std::string explain_zone(const std::string &raw_zone) {
+  const std::string zone = zone_stem(raw_zone);
+  if (const std::string_view mode = mode_pack_of(zone);
+      !mode.empty() && !zone_file_present(zone)) {
+    return explain_missing_mode_data(zone, mode);
+  }
   const size_t separator = zone.find('_');
   if (separator != std::string::npos &&
       LANGUAGE_PREFIXES.contains(zone.substr(0, separator))) {
@@ -240,6 +318,68 @@ constexpr char HELP_OUT_OF_MEMORY[] =
 constexpr char HELP_LOCAL_ENTITY_LIMIT[] =
     "^1The map uses more client-side entities than the game allows.\n^3Fix: "
     "^7This is a limit in the map itself. Report it to the map author.";
+
+// Which mode-common zone a level needs, and whether that zone is installed.
+std::string missing_mode_for_level(const char *level) {
+  if (level == nullptr || level[0] == '\0') {
+    return {};
+  }
+  const std::string name = zone_stem(level);
+  if (const std::string_view mode = mode_pack_of(name); !mode.empty()) {
+    return zone_file_present(name) ? std::string{}
+                                   : explain_missing_mode_data(name, mode);
+  }
+  const size_t separator = name.find('_');
+  if (separator == std::string::npos) {
+    return {};
+  }
+  const auto mode = MODE_PACKS.find(name.substr(0, separator));
+  if (mode == MODE_PACKS.end()) {
+    return {};
+  }
+  const std::string common = name.substr(0, separator) + "_common";
+  return zone_file_present(common)
+             ? std::string{}
+             : explain_missing_mode_data(common, mode->second);
+}
+
+// The zone name the game quotes in 'FastFileLoad: 'mp_common' is unloadable'.
+std::string quoted_zone(const std::string &message) {
+  const size_t start = message.find('\'');
+  if (start == std::string::npos) {
+    return {};
+  }
+  const size_t end = message.find('\'', start + 1);
+  if (end == std::string::npos) {
+    return {};
+  }
+  return message.substr(start + 1, end - start - 1);
+}
+
+std::string explain_fastfile(const std::string &zone) {
+  const std::string name = zone_stem(zone);
+  if (const std::string_view mode = mode_pack_of(name);
+      !mode.empty() && !zone_file_present(name)) {
+    return explain_missing_mode_data(name, mode);
+  }
+  return HELP_DAMAGED_FASTFILE;
+}
+
+void Sys_Error_DamagedFastfile(const char *fmt, const char *first,
+                               const char *second) {
+  std::string zone = quoted_zone(utils::string::va(fmt, first, second));
+  if (zone.empty()) {
+    zone = first != nullptr ? first : "";
+  }
+  Sys_Error_Explained(strip_colors(explain_fastfile(zone)), fmt, first, second);
+}
+
+void Com_Error_DamagedFastfile(const char *file, const int32_t line,
+                               const game::errorParm code, const char *fmt,
+                               const char *zone) {
+  Com_Error_Explained(file, line, code, explain_fastfile(zone ? zone : ""), fmt,
+                      zone);
+}
 
 template <const char *Help, typename... Args>
 void Com_Error_WithHelp(const char *file, const int32_t line,
@@ -483,6 +623,10 @@ void Com_Error_LuiOutOfMemory(const char *file, const int32_t line,
   Com_Error_Explained(file, line, code, LUI_OUT_OF_MEMORY_HELP, fmt);
 }
 
+std::string explain_missing_mode_for_level(const char *level) {
+  return missing_mode_for_level(level);
+}
+
 void Sys_Error_LuiOutOfMemory(const char *fmt) {
   Sys_Error_Explained(strip_colors(LUI_OUT_OF_MEMORY_HELP), fmt);
 }
@@ -650,11 +794,9 @@ struct component final : generic_component {
                 0x1426705E7},
                {0x1406EAFFC},
                Com_Error_WithHelp<HELP_INVALID_FILE, const char *>);
-    hook_calls(
-        {0x1420F2DF7}, {0x140507AE7},
-        Sys_Error_WithHelp<HELP_DAMAGED_FASTFILE, const char *, const char *>);
+    hook_calls({0x1420F2DF7}, {0x140507AE7}, Sys_Error_DamagedFastfile);
     hook_calls({0x1413F0009, 0x1413F05C5}, {0x1401A5340, 0x1401A58D7},
-               Com_Error_WithHelp<HELP_DAMAGED_FASTFILE, const char *>);
+               Com_Error_DamagedFastfile);
     hook_calls({0x14224F266}, {},
                Com_Error_WithHelp<HELP_OUT_OF_MEMORY, int64_t, int64_t, int64_t,
                                   int64_t>);
