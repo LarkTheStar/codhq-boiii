@@ -3,6 +3,7 @@
 #include <loader/component_loader.hpp>
 
 #include "command.hpp"
+#include "error_help.hpp"
 #include "scheduler.hpp"
 #include "workshop/workshop.hpp"
 
@@ -120,25 +121,6 @@ void PrintWaitedError_stub(const XAssetType type, const char *name,
   PrintWaitedError_hook.invoke(type, name, waitedMsec);
 }
 
-bool has_mode_zone(const std::filesystem::path &zone, const char *prefix) {
-  std::error_code ec;
-  for (const std::filesystem::directory_entry &entry :
-       std::filesystem::directory_iterator(zone, ec)) {
-    if (!entry.is_regular_file(ec)) {
-      continue;
-    }
-    std::string name = entry.path().filename().string();
-    std::ranges::transform(name, name.begin(), [](unsigned char c) {
-      return static_cast<char>(std::tolower(c));
-    });
-    if (name.starts_with(prefix) &&
-        (name.ends_with(".ff") || name.ends_with(".xpak"))) {
-      return true;
-    }
-  }
-  return false;
-}
-
 // Issue #410: with the Zombies menu open and no zm_ zone files, the game
 // dead-ends when a map is picked. Joining a Multiplayer server without the
 // mode's common zone does the same, and the engine reports it as a null asset
@@ -151,22 +133,22 @@ void warn_if_mode_data_missing() {
     return;
   }
   const std::string where = zone.string();
-  if (!has_mode_zone(zone, "mp_")) {
-    printf("^1[ Multiplayer ]^7 No Multiplayer data was found in %s: there is "
-           "no mp_*.ff or mp_*.xpak in it (zone/mp_common.ff is missing), so "
-           "joining a server cannot work. In Steam: right-click Black Ops III "
-           "> Properties > DLC, tick 'Multiplayer' and let it download, then "
+  if (!error_help::mode_data_installed("mp")) {
+    printf("^1[ Multiplayer ]^7 The Multiplayer pack is not installed in %s: "
+           "there is no mp_common or mp_patch fast file in it, so joining a "
+           "server cannot work. In Steam: right-click Black Ops III > "
+           "Properties > DLC, tick 'Multiplayer' and let it download, then "
            "start again. If it is already ticked, use Properties > Installed "
            "Files > Verify integrity of game files.\n",
            where.c_str());
   }
-  if (!has_mode_zone(zone, "zm_")) {
-    printf("^1[ Zombies ]^7 No Zombies map data was found in %s: there is no "
-           "zm_*.ff or zm_*.xpak in it, so the Zombies entry cannot start a "
-           "game. In Steam: right-click Black Ops III > Properties > DLC, "
-           "tick 'Zombies' and let it download, then start again. If it is "
-           "already ticked, use Properties > Installed Files > Verify "
-           "integrity of game files.\n",
+  if (!error_help::mode_data_installed("zm")) {
+    printf("^1[ Zombies ]^7 The Zombies pack is not installed in %s: there "
+           "is no zm_common or zm_patch fast file in it, so the Zombies entry "
+           "cannot start a game. In Steam: right-click Black Ops III > "
+           "Properties > DLC, tick 'Zombies' and let it download, then start "
+           "again. If it is already ticked, use Properties > Installed Files > "
+           "Verify integrity of game files.\n",
            where.c_str());
   }
 }

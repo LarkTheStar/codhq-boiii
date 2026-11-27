@@ -627,6 +627,16 @@ std::string explain_missing_mode_for_level(const char *level) {
   return missing_mode_for_level(level);
 }
 
+bool mode_data_installed(const char *mode) {
+  const std::string prefix =
+      utils::string::to_lower(mode != nullptr ? mode : "");
+  if (prefix.empty()) {
+    return true;
+  }
+  return zone_file_present(prefix + "_common") ||
+         zone_file_present(prefix + "_patch");
+}
+
 void Sys_Error_LuiOutOfMemory(const char *fmt) {
   Sys_Error_Explained(strip_colors(LUI_OUT_OF_MEMORY_HELP), fmt);
 }
